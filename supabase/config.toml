@@ -1,0 +1,8 @@
+project_id = "zfibsvuntawggeixrhsk"
+
+[functions.affiliate-admin-user]
+verify_jwt = true
+
+[functions.send-affiliate-notifications]
+verify_jwt = false
+
