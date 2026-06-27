@@ -7,7 +7,13 @@ import { isSupabaseConfigured, supabase } from '../lib/supabase'
 type Affiliate = { id:string; name:string; email:string|null; status:string; default_discount_amount:number; created_at:string }
 
 export function AdminDashboard() {
-  const cards = [['Afiliados activos','8',Users],['Clientes afiliados','23',Building2],['Pendiente de liberar',mxn.format(12450),Clock3],['Disponible para pago',mxn.format(18780),BadgeDollarSign]] as const
+  const [metrics,setMetrics]=useState({affiliates:0,clients:0,pending:0,available:0})
+  useEffect(()=>{if(!isSupabaseConfigured)return;void Promise.all([
+    supabase.from('affiliates').select('*',{count:'exact',head:true}).eq('status','active'),
+    supabase.from('client_affiliations').select('*',{count:'exact',head:true}).eq('status','active'),
+    supabase.from('affiliate_commissions').select('commission_amount,status').in('status',['pending','available']),
+  ]).then(([a,c,commissions])=>{const totals=(commissions.data??[]).reduce((sum,row)=>{sum[row.status as 'pending'|'available']+=Number(row.commission_amount);return sum},{pending:0,available:0});setMetrics({affiliates:a.count??0,clients:c.count??0,...totals})})},[])
+  const cards = [['Afiliados activos',String(metrics.affiliates),Users],['Clientes afiliados',String(metrics.clients),Building2],['Pendiente de liberar',mxn.format(metrics.pending),Clock3],['Disponible para pago',mxn.format(metrics.available),BadgeDollarSign]] as const
   return <section className="page-content"><div className="metric-grid">{cards.map(([label,value,Icon]) => <article className="metric" key={label}><div><span>{label}</span><strong>{value}</strong><small>Vista operativa</small></div><Icon/></article>)}</div><div className="admin-callout"><CircleCheckBig/><div><h2>Operación al día</h2><p>Las comisiones vencidas se liberan mediante el proceso programado e idempotente.</p></div></div></section>
 }
 
