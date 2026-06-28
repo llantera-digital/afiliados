@@ -5,6 +5,8 @@ import { formatDate, mxn } from '../lib/format'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 
 type Affiliate = { id:string; name:string; email:string|null; status:string; default_discount_amount:number; created_at:string }
+type ClientOption = { cliente_id:string; nombre_negocio:string; ciudad:string|null; estado:string|null }
+type AffiliateOption = { id:string; name:string }
 
 export function AdminDashboard() {
   const [metrics,setMetrics]=useState({affiliates:0,clients:0,pending:0,available:0})
@@ -44,8 +46,38 @@ export function PaymentsAdmin() {
 
 export function AffiliatedClientsAdmin() {
   const [rows,setRows]=useState<Array<Record<string,unknown>>>([])
-  useEffect(()=>{if(isSupabaseConfigured)void supabase.from('client_affiliations').select('id,status,discount_amount_snapshot,affiliated_at,clientes(nombre_negocio,ciudad,estado,pais),affiliates(name),affiliate_coupons(code)').order('affiliated_at',{ascending:false}).then(({data})=>setRows(data??[]))},[])
-  return <section className="page-content"><div className="section-heading"><div><h2>Clientes afiliados</h2><p>Afiliación original, cupón y descuento permanente.</p></div></div><div className="table-wrap"><table><thead><tr><th>Cliente</th><th>Ubicación</th><th>Afiliado</th><th>Cupón</th><th>Descuento</th><th>Estado</th></tr></thead><tbody>{rows.map((r)=>{const c=r.clientes as Record<string,unknown>,a=r.affiliates as Record<string,unknown>,q=r.affiliate_coupons as Record<string,unknown>;return <tr key={String(r.id)}><td><strong>{String(c?.nombre_negocio??'—')}</strong></td><td>{[c?.ciudad,c?.estado,c?.pais].filter(Boolean).join(', ')}</td><td>{String(a?.name??'—')}</td><td>{String(q?.code??'—')}</td><td>{mxn.format(Number(r.discount_amount_snapshot))}</td><td><StatusTag status={String(r.status)}/></td></tr>})}</tbody></table></div></section>
+  const [clients,setClients]=useState<ClientOption[]>([])
+  const [affiliates,setAffiliates]=useState<AffiliateOption[]>([])
+  const [open,setOpen]=useState(false)
+  const [message,setMessage]=useState('')
+  const [saving,setSaving]=useState(false)
+  const today=new Date().toLocaleDateString('en-CA')
+  const load=async()=>{
+    if(!isSupabaseConfigured)return
+    const [affiliationsResult,clientsResult,affiliatesResult]=await Promise.all([
+      supabase.from('client_affiliations').select('id,client_id,status,discount_amount_snapshot,affiliated_at,clientes(nombre_negocio,ciudad,estado,pais),affiliates(name),affiliate_coupons(code)').order('affiliated_at',{ascending:false}),
+      supabase.from('clientes').select('cliente_id,nombre_negocio,ciudad,estado').order('nombre_negocio'),
+      supabase.from('affiliates').select('id,name').eq('status','active').order('name'),
+    ])
+    setRows(affiliationsResult.data??[])
+    const assigned=new Set((affiliationsResult.data??[]).map(row=>String(row.client_id)))
+    setClients((clientsResult.data??[]).filter(client=>!assigned.has(client.cliente_id)))
+    setAffiliates(affiliatesResult.data??[])
+  }
+  useEffect(()=>{void load()},[])
+  const assign=async(event:FormEvent<HTMLFormElement>)=>{
+    event.preventDefault();setMessage('');setSaving(true)
+    const form=new FormData(event.currentTarget)
+    const {error}=await supabase.rpc('assign_affiliate_late',{
+      p_client_id:form.get('client'),p_affiliate_id:form.get('affiliate'),
+      p_effective_date:form.get('date'),p_reason:form.get('reason'),
+    })
+    setSaving(false)
+    if(error){setMessage(error.message);return}
+    setMessage('Afiliado asignado. Las comisiones comenzarán en la siguiente mensualidad.')
+    setOpen(false);await load()
+  }
+  return <section className="page-content"><div className="section-heading"><div><h2>Clientes afiliados</h2><p>Afiliación original, cupón y descuento permanente.</p></div><button className="primary-button compact" onClick={()=>{setMessage('');setOpen(true)}}>Asignar afiliado</button></div>{open?<form className="inline-form" onSubmit={(event)=>void assign(event)}><label>Cliente<select name="client" required defaultValue=""><option value="" disabled>Selecciona un cliente</option>{clients.map(client=><option key={client.cliente_id} value={client.cliente_id}>{client.nombre_negocio}{client.ciudad?` · ${client.ciudad}${client.estado?`, ${client.estado}`:''}`:''}</option>)}</select></label><label>Afiliado<select name="affiliate" required defaultValue=""><option value="" disabled>Selecciona un afiliado</option>{affiliates.map(affiliate=><option key={affiliate.id} value={affiliate.id}>{affiliate.name}</option>)}</select></label><label>Fecha efectiva<input name="date" type="date" required defaultValue={today} max={today}/></label><label>Motivo de la atribución<textarea name="reason" required minLength={10} placeholder="Ej. El cliente confirmó que fue referido por Susy."/></label>{clients.length===0?<div className="form-error">No hay clientes disponibles sin afiliado.</div>:null}<button className="primary-button" disabled={saving||clients.length===0}>{saving?'Asignando…':'Guardar asignación'}</button><button type="button" className="secondary-button" onClick={()=>setOpen(false)}>Cancelar</button></form>:null}{message?<div className={message.startsWith('Afiliado asignado')?'form-message':'form-error'}>{message}</div>:null}<div className="table-wrap"><table><thead><tr><th>Cliente</th><th>Ubicación</th><th>Afiliado</th><th>Cupón</th><th>Descuento</th><th>Fecha efectiva</th><th>Estado</th></tr></thead><tbody>{rows.length?rows.map((r)=>{const c=r.clientes as Record<string,unknown>,a=r.affiliates as Record<string,unknown>,q=r.affiliate_coupons as Record<string,unknown>;return <tr key={String(r.id)}><td><strong>{String(c?.nombre_negocio??'—')}</strong></td><td>{[c?.ciudad,c?.estado,c?.pais].filter(Boolean).join(', ')}</td><td>{String(a?.name??'—')}</td><td>{String(q?.code??'—')}</td><td>{mxn.format(Number(r.discount_amount_snapshot))}</td><td>{formatDate(String(r.affiliated_at))}</td><td><StatusTag status={String(r.status)}/></td></tr>}):<tr><td colSpan={7} className="empty">Aún no hay clientes afiliados.</td></tr>}</tbody></table></div></section>
 }
 
 export function CommissionsAdmin() {
