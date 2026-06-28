@@ -40,3 +40,9 @@ export interface VisibleClient {
   commission_tiers: Array<{ start: number; end: number | null; rate: number; indefinite: boolean }>
 }
 
+export interface VisibleCoupon {
+  code: string
+  discount_amount: number
+  status: string
+  default_tiers: Array<{ start: number; end: number | null; rate: number; indefinite: boolean }>
+}

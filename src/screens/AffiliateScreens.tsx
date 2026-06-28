@@ -4,7 +4,7 @@ import { StatusTag } from '../components/StatusTag'
 import { demoClients, demoCommissions, demoSummary } from '../data/demo'
 import { formatDate, mxn } from '../lib/format'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
-import type { DashboardSummary, VisibleClient, VisibleCommission } from '../types'
+import type { DashboardSummary, VisibleClient, VisibleCommission, VisibleCoupon } from '../types'
 
 function CommissionTable({ rows }: { rows: VisibleCommission[] }) {
   return <div className="table-wrap"><table><thead><tr><th>Llantera</th><th>Ciudad</th><th>Mensualidad</th><th>Base sin IVA</th><th>Porcentaje</th><th>Comisión</th><th>Estado</th></tr></thead><tbody>{rows.map(row => <tr key={row.id}><td><strong>{row.nombre_negocio}</strong></td><td>{row.ciudad ?? '—'}</td><td>#{row.payment_number}</td><td>{mxn.format(row.commissionable_amount)}</td><td>{row.commission_rate}%</td><td><strong>{mxn.format(row.commission_amount)}</strong></td><td><StatusTag status={row.status}/></td></tr>)}</tbody></table></div>
@@ -34,5 +34,28 @@ export function ClientsScreen() {
 
 export function CommissionsScreen() { return <section className="page-content"><div className="section-heading"><div><h2>Comisiones</h2><p>Todos los importes se muestran sin IVA.</p></div></div><CommissionTable rows={demoCommissions}/></section> }
 
-export function CouponScreen() { return <section className="page-content"><div className="coupon-card"><div><span>Tu cupón</span><strong>AFILIADO1000</strong><p>Tu público recibe un descuento permanente al contratar.</p></div><div><span>Descuento fijo</span><strong>{mxn.format(1000)}</strong><p>Se conserva mientras el cliente mantenga o reactive su cuenta.</p></div><div><span>Esquema para clientes nuevos</span><strong>50%</strong><p>Mensualidades 1–12 · después 10% hasta la 24.</p></div></div></section> }
+export function CouponScreen() {
+  const [coupon, setCoupon] = useState<VisibleCoupon | null>(null)
+  const [error, setError] = useState('')
 
+  useEffect(() => {
+    if (!isSupabaseConfigured) return
+    void supabase.from('affiliate_visible_coupon').select('*').eq('status', 'active').single()
+      .then(({ data, error: queryError }) => {
+        if (queryError) setError('No fue posible cargar tu cupón.')
+        else setCoupon(data as VisibleCoupon)
+      })
+  }, [])
+
+  if (error) return <section className="page-content"><div className="form-error">{error}</div></section>
+  if (!coupon) return <section className="page-content"><p>Cargando cupón…</p></section>
+
+  const tiers = coupon.default_tiers
+  const primaryRate = tiers[0]?.rate ?? 0
+  const tierDescription = tiers.map((tier, index) => {
+    const range = tier.indefinite ? `desde la mensualidad ${tier.start}` : `mensualidades ${tier.start}–${tier.end}`
+    return `${index ? 'después, ' : ''}${tier.rate}% en ${range}`
+  }).join(' · ')
+
+  return <section className="page-content"><div className="coupon-card"><div><span>Tu cupón</span><strong>{coupon.code}</strong><p>Tu público recibe un descuento permanente al contratar.</p></div><div><span>Descuento fijo</span><strong>{mxn.format(Number(coupon.discount_amount))}</strong><p>Se conserva mientras el cliente mantenga o reactive su cuenta.</p></div><div><span>Esquema para clientes nuevos</span><strong>{primaryRate}%</strong><p>{tierDescription}</p></div></div></section>
+}
