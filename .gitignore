@@ -11,3 +11,7 @@ playwright-report/
 test-results/
 *.tsbuildinfo
 supabase/.temp/
+
+# Archivo histórico privado y evidencias de mantenimiento.
+/RECUERDO/
+/work/
