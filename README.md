@@ -11,9 +11,9 @@ El objetivo es conservar un proyecto ordenado, comprensible y coordinado. La lim
 | Parte | Estado |
 |---|---|
 | Limpieza del 24-oct | Seis archivos archivados, tres originales conservados y nueve registros verificados en [RECUERDO/INVENTARIO.csv](RECUERDO/INVENTARIO.csv). |
-| Código actual en disco | Incluye correcciones funcionales posteriores: cuatro archivos nuevos y dos modificados, aún no desplegados. No asumir que todo `supabase/` coincide con producción. |
+| Código actual en disco | El alta corregida está publicada como v19. Las dos migraciones y la función de avisos corregida siguen pendientes. No asumir que todo `supabase/` coincide con producción. |
 | Versión anterior | Los dos `index.ts` originales están conservados y verificados contra las huellas anteriores al cambio. No se restauraron. |
-| Producción | La entrega del otro agente registra consultas de solo lectura; este cierre no volvió a consultar servicios ni certifica equivalencia del código desplegado. |
+| Producción | Alta v19 activa, con `verify_jwt=true`, confirmada en Supabase. Avisos v16. Las pruebas sintéticas publicadas se documentan abajo; no certifican todo el módulo financiero. |
 | Trabajo futuro | Las correcciones y su despliegue requieren una tarea separada. No instalar entornos en esta PC; una futura validación integrada será en la nube. |
 
 El [inventario funcional y los originales](work/cambio-20261025/EVIDENCIAS.md) distinguen ambas versiones sin perder trabajo. No ejecutar `db push`, migraciones ni scripts de reversión como parte de la limpieza.
@@ -28,7 +28,7 @@ El [inventario funcional y los originales](work/cambio-20261025/EVIDENCIAS.md) d
 
 ## Pendientes funcionales fuera del cierre de limpieza
 
-La tabla siguiente describe los hallazgos originales del 24-oct y sus criterios de cierre. Las primeras tres filas tienen correcciones locales conservadas, descritas después; no representan defectos aún presentes en esos archivos locales ni correcciones ya publicadas.
+La tabla siguiente describe los hallazgos originales del 24-oct y sus criterios de cierre. Las primeras tres filas describen el comportamiento anterior: el alta ya fue corregida y publicada; conteo y outbox tienen correcciones locales todavía no aplicadas. Consultar el estado de cada corrección más abajo.
 
 ### Hallazgos originales y criterios para una futura corrección
 
@@ -45,17 +45,25 @@ La compilación y las cuatro pruebas actuales pasan, pero esas pruebas solo cubr
 | **P2 · interfaz y errores de datos** | Varias consultas sustituyen errores por listas vacías o ceros; el cupón puede quedar en Cargando cuando falta configuración. No hay pantallas para todas las operaciones SQL existentes —crear periodos, anular pagos, cambiar etapas y registrar payouts— y el pago exige introducir un UUID de periodo. | Distinguir error, ausencia de datos y carga. Completar o delimitar el flujo administrativo antes de presentarlo como operación integral. Añadir estados y permisos verificables. |
 | **P2 · automatizaciones y política vigente** | No hay en estos archivos evidencia de un cron activo para liberar comisiones/enviar outbox. Además, la migración posterior incorpora atribución tardía, excepción a la especificación inicial de cupón exclusivo al contratar. | Verificar programación real y dominio de correo sin asumir que están activos. Conciliar la regla de atribución tardía con la política aprobada, sin quitar esa función ni cambiar condiciones comerciales durante mantenimiento. |
 
-### Correcciones locales conservadas, sin desplegar
+### Estado de las correcciones (2026-10-25)
 
-Son exactamente seis archivos funcionales: dos migraciones nuevas `20261025000000_fix_affiliate_p1.sql` y `20261025010000_outbox_claim_identity.sql`; dos `core.mjs` nuevos y dos `index.ts` modificados en las funciones de altas y avisos. Las cinco migraciones anteriores no se modificaron.
+La corrección del alta está **publicada** en Supabase como `affiliate-admin-user` **v19** (2026-10-25 15:40 UTC, `verify_jwt = true`). Las correcciones de conteo y outbox **siguen sin publicar**: sus dos migraciones no se aplicaron y `send-affiliate-notifications` sigue en v16.
 
-| Corrección | Evidencia local | Estado |
+| Corrección | Archivos | Estado |
 |---|---|---|
-| Conteo sin multiplicación por etapas | 6 escenarios | Pendiente de adopción y despliegue. |
-| Validación y compensación de altas | 12 casos | Pendiente de validar Auth real y efectos ante fallos. |
-| Reclamación y recuperación del outbox | 10 casos | Pendiente de validar ejecución y proveedor reales. |
+| Validación y compensación de altas | `affiliate-admin-user/index.ts` y `core.mjs` | **Publicada** (v19) |
+| Conteo sin multiplicación por etapas | migración `20261025000000` | Pendiente de aplicar |
+| Reclamación y recuperación del outbox | migración `20261025010000` y `send-affiliate-notifications/*` | Pendiente de aplicar y publicar |
 
-La revisión verificada dio **17 aprobadas / 11 fallidas antes** y **28 / 0 después**. El portal pasó **4/4 pruebas**, TypeScript y Vite. Estas comprobaciones no certifican todo el negocio financiero.
+**Publicación del alta.** Incluye dos defectos encontrados en la revisión previa: el JSON malformado ahora se rechaza con 400 (`parsearCuerpo`) y las compensaciones incompletas se registran con `COMPENSATION_PARTIAL` desde el adaptador. El contrato del frontend no cambió: `201 {id, username, role}` en éxito y `{error}` en error; `compensacion_incompleta` solo aparece si la compensación falla.
+
+**Pruebas de la publicación.** Contra la función publicada se ejecutaron diez comprobaciones con usuarios sintéticos: 401 sin sesión, 403 sin rol admin, 400 por JSON malformado, 400 sin etapas y con etapas inválidas, 201 en alta válida, 400 por usuario duplicado, registros 1/1/1/1/2 y limpieza 0/0/0/0. Evidencia en `work/prueba-publicada/resultado.json`. Los recursos sintéticos se eliminaron y se verificó que no quedaran restos.
+
+**Restauración.** El código desplegado de v18 se recuperó del bundle eszip y se conserva en `work/restauracion-v18/index.ts` (hash `9437875D…`), junto con el bundle íntegro. Esa copia difiere de `work/cambio-20261025/antes/` solo en la codificación de acentos y dos líneas en blanco. Para volver a v18: copiar ese `index.ts` sobre la función y desplegar; el `core.mjs` actual queda sin uso.
+
+**Limitaciones.** Las migraciones de conteo y outbox no se aplicaron; no se publicó `send-affiliate-notifications`; no se tocaron permisos, cron, modelos ni WhatsApp. Git está disponible en la sesión de cierre. Se verificó directamente que GitHub `main` ya estaba en `4bede97`; la referencia antigua del informe no describía el remoto actual. Esta publicación del alta se registra en un commit posterior sobre `main`.
+
+La batería conjunta reportó **18 aprobadas / 11 fallidas antes** y **29 / 0 después** (alta, conteo y outbox). La revisión posterior ejecutó además las **13/13 pruebas específicas del alta**; no son 29 pruebas exclusivas del alta. El portal pasó **4/4 pruebas**, TypeScript y Vite. Estas comprobaciones no certifican todo el negocio financiero.
 
 Las **39/39 comprobaciones adicionales** pertenecen a un ensayo embebido con tablas sintéticas, sustituto de Auth y privilegios preparados para las pruebas. Ejerce RLS de PostgreSQL, pero no reproduce por sí solo Auth, la API o el correo reales. La visibilidad de `clientes` allí no acredita los grants de producción. La entrega posterior registra RLS desactivado en producción, pero deja sus privilegios efectivos y alcance de acceso pendientes de comprobar.
 
@@ -66,7 +74,7 @@ Las **39/39 comprobaciones adicionales** pertenecen a un ensayo embebido con tab
 | [Análisis de correcciones](../00_CONTROL_DEL_PROYECTO/19_correcciones_06.md) | Detalle técnico de la etapa funcional posterior. |
 | [Plan de validación y despliegue](../00_CONTROL_DEL_PROYECTO/20_validacion_y_despliegue_06.md) | Propuesta para una tarea futura; este cierre no autoriza ejecutarla. |
 
-Los originales y scripts de reversión se conservan; no se ejecutaron. Tampoco se movieron los cambios a otra raíz o se sincronizaron con otros proyectos.
+Los originales y scripts de reversión se conservan; no se ejecutaron. Tampoco se movieron los cambios a otra raíz o se sincronizaron con otros proyectos. El código desplegado de v18 se recuperó del bundle y se conserva en `work/restauracion-v18/`, junto con la evidencia de la publicación.
 
 ## Estructura vigente
 

@@ -11,6 +11,20 @@ export function emailInterno(username) {
   return `${String(username).trim().toLocaleLowerCase('es-MX').replace(/[^a-z0-9._-]/g, '')}@afiliados.llantera.digital`;
 }
 
+// Lectura del cuerpo con respuesta controlada: JSON malformado, vacío o que no
+// sea un objeto se rechazan antes de tocar la base o Auth.
+export function parsearCuerpo(texto) {
+  const crudo = typeof texto === 'string' ? texto.trim() : '';
+  if (!crudo) return { ok: false, error: 'Cuerpo vacío' };
+  let body;
+  try { body = JSON.parse(crudo); }
+  catch { return { ok: false, error: 'JSON inválido' }; }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return { ok: false, error: 'Cuerpo inválido' };
+  }
+  return { ok: true, body };
+}
+
 export function validarAlta(body) {
   const username = String(body?.username ?? '').trim();
   const password = String(body?.password ?? '');

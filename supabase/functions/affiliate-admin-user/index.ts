@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "npm:@supabase/supabase-js@2.50.0"
-import { validarAlta, ejecutarAlta } from "./core.mjs"
+import { validarAlta, ejecutarAlta, parsearCuerpo } from "./core.mjs"
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -24,15 +24,23 @@ Deno.serve(async (request) => {
   const { data: profile } = await admin.from("affiliate_portal_users").select("role,is_active").eq("auth_user_id", userData.user.id).single()
   if (profile?.role !== "admin" || !profile.is_active) return json({ error: "Acceso denegado" }, 403)
 
-  const body = await request.json()
+  let crudo: string
+  try { crudo = await request.text() }
+  catch { return json({ error: "Cuerpo inválido" }, 400) }
+
   // Se valida el cuerpo completo antes de escribir cualquier cosa.
-  const validacion = validarAlta(body)
+  const parseado = parsearCuerpo(crudo)
+  if (!parseado.ok) return json({ error: parseado.error }, 400)
+  const validacion = validarAlta(parseado.body)
   if (!validacion.ok) return json({ error: validacion.error }, 400)
 
   // Los adaptadores convierten los errores de Supabase en excepciones, para que
   // el núcleo tenga un solo camino de error y pueda compensar.
   const exigir = (error: { message: string } | null) => { if (error) throw new Error(error.message) }
   const deps = {
+    registrar: (evento: string, datos: Record<string, unknown>) => {
+      console.error(evento + " " + JSON.stringify(datos))
+    },
     crearUsuario: async (datos: { email: string; password: string; role: string }) => {
       const { data, error } = await admin.auth.admin.createUser({
         email: datos.email, password: datos.password, email_confirm: true,
