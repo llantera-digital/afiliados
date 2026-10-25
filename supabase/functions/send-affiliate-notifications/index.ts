@@ -7,19 +7,30 @@ const entero = (valor: string | undefined, porOmision: number) => {
   const n = Number(valor)
   return Number.isInteger(n) ? n : porOmision
 }
+const entre = (valor: string | undefined, porOmision: number, minimo: number, maximo: number) => {
+  const n = entero(valor, porOmision)
+  return n >= minimo && n <= maximo ? n : porOmision
+}
 
 Deno.serve(async (request) => {
-  if (request.headers.get("x-cron-secret") !== Deno.env.get("AFFILIATE_CRON_SECRET")) {
+  // Sin secreto configurado no hay forma válida de invocar: se rechaza siempre.
+  const esperado = Deno.env.get("AFFILIATE_CRON_SECRET")
+  if (!esperado || request.headers.get("x-cron-secret") !== esperado) {
     return Response.json({ error: "Acceso denegado" }, { status: 401 })
   }
+
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
 
   // Valores configurables; los predeterminados están documentados en el README.
-  const lote = entero(Deno.env.get("AFFILIATE_OUTBOX_BATCH"), 20)
-  const arriendo = entero(Deno.env.get("AFFILIATE_OUTBOX_LEASE_SECONDS"), 300)
-  const gracia = entero(Deno.env.get("AFFILIATE_OUTBOX_LEGACY_GRACE_SECONDS"), 900)
+  const lote = entre(Deno.env.get("AFFILIATE_OUTBOX_BATCH"), 20, 1, 100)
+  const arriendo = entre(Deno.env.get("AFFILIATE_OUTBOX_LEASE_SECONDS"), 300, 1, 3600)
+  const gracia = entre(Deno.env.get("AFFILIATE_OUTBOX_LEGACY_GRACE_SECONDS"), 900, 0, 86400)
+  const envioMs = entre(Deno.env.get("AFFILIATE_OUTBOX_SEND_TIMEOUT_MS"), 10000, 1000, 30000)
+  const maxEjecucion = entre(Deno.env.get("AFFILIATE_OUTBOX_MAX_RUN_SECONDS"), 240, 5, 3600)
+  // El lote nunca debe durar más que el arriendo: 80 % del arriendo o el tope.
+  const presupuestoMs = Math.max(1000, Math.min(maxEjecucion * 1000, Math.round(arriendo * 1000 * 0.8)))
 
   const registrar = (evento: string, datos: Record<string, unknown>) => {
     console.error(evento + " " + JSON.stringify(datos))
@@ -45,6 +56,8 @@ Deno.serve(async (request) => {
           // Best-effort: evita el reenvío si el proveedor respeta la clave.
           "Idempotency-Key": row.id,
         },
+        // Un envío bloqueado no puede retener la ejecución más allá de este plazo.
+        signal: AbortSignal.timeout(envioMs),
         body: JSON.stringify({
           from: Deno.env.get("AFFILIATE_EMAIL_FROM") ?? "Comisiones Llantera Digital <comisiones@llantera.digital>",
           to: [row.recipient], subject: "Nueva comisión generada — Llantera Digital",
@@ -70,12 +83,17 @@ Deno.serve(async (request) => {
     },
   }
 
-  const resultado = await procesarAvisos(deps, { limite: lote })
-  // Se conservan `processed` y `sent`; `failed` y `late` son aditivos.
-  return Response.json({
-    processed: resultado.procesados,
-    sent: resultado.enviados,
-    failed: resultado.fallidos,
-    late: resultado.tardios,
-  })
+  try {
+    const resultado = await procesarAvisos(deps, { limite: lote, presupuestoMs })
+    // Se conservan `processed` y `sent`; `failed` y `late` son aditivos.
+    return Response.json({
+      processed: resultado.procesados,
+      sent: resultado.enviados,
+      failed: resultado.fallidos,
+      late: resultado.tardios,
+    })
+  } catch (error) {
+    registrar("OUTBOX_RUN_FAILED", { error: String(error?.message ?? error) })
+    return Response.json({ error: "No se pudo procesar" }, { status: 500 })
+  }
 })

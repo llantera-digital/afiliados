@@ -45,6 +45,20 @@ begin
     raise exception 'p_legacy_grace_seconds fuera de rango';
   end if;
 
+  -- Filas que agotaron sus intentos y quedaron colgadas (por ejemplo, una caída
+  -- después de reclamar) se cierran como fallidas para que sean visibles. No se
+  -- reenvían: el selector solo toma intentos menores a 5.
+  update public.affiliate_notification_outbox o
+     set status = 'failed',
+         last_error = 'intentos agotados',
+         claim_expires_at = null
+   where o.status = 'processing'
+     and o.attempts >= 5
+     and (
+       (o.claim_expires_at is not null and o.claim_expires_at < now())
+       or (o.claim_expires_at is null and o.created_at < now() - make_interval(secs => p_legacy_grace_seconds))
+     );
+
   return query
   with picked as (
     select c.id

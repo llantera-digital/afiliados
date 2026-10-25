@@ -11,9 +11,9 @@ El objetivo es conservar un proyecto ordenado, comprensible y coordinado. La lim
 | Parte | Estado |
 |---|---|
 | Limpieza del 24-oct | Seis archivos archivados, tres originales conservados y nueve registros verificados en [RECUERDO/INVENTARIO.csv](RECUERDO/INVENTARIO.csv). |
-| Código actual en disco | El alta está publicada como v19 y el conteo aplicado (migración `20261025000000`). La migración de outbox y la función de avisos corregida siguen pendientes. No asumir que todo `supabase/` coincide con producción. |
+| Código actual en disco | Alta v19, conteo aplicado (migración `20261025000000`) y outbox aplicado (migración `20261025010000`, función v17). El envío real de correo sigue pendiente de verificar. No asumir que todo `supabase/` coincide con producción. |
 | Versión anterior | Los dos `index.ts` originales están conservados y verificados contra las huellas anteriores al cambio. No se restauraron. |
-| Producción | Alta v19 activa, con `verify_jwt=true`, confirmada en Supabase. Avisos v16. Las pruebas sintéticas publicadas se documentan abajo; no certifican todo el módulo financiero. |
+| Producción | Alta v19 activa, con `verify_jwt=true`, confirmada en Supabase. Avisos v17, con `verify_jwt=false`. Las pruebas sintéticas publicadas se documentan abajo; no certifican todo el módulo financiero. |
 | Trabajo futuro | Las correcciones y su despliegue requieren una tarea separada. No instalar entornos en esta PC; una futura validación integrada será en la nube. |
 
 El [inventario funcional y los originales](work/cambio-20261025/EVIDENCIAS.md) distinguen ambas versiones sin perder trabajo. No ejecutar `db push`, migraciones ni scripts de reversión como parte de la limpieza.
@@ -28,7 +28,7 @@ El [inventario funcional y los originales](work/cambio-20261025/EVIDENCIAS.md) d
 
 ## Pendientes funcionales fuera del cierre de limpieza
 
-La tabla siguiente describe los hallazgos originales del 24-oct y sus criterios de cierre. Las primeras tres filas describen el comportamiento anterior: el alta ya fue corregida y publicada; conteo y outbox tienen correcciones locales todavía no aplicadas. Consultar el estado de cada corrección más abajo.
+La tabla siguiente describe los hallazgos originales del 24-oct y sus criterios de cierre. Las primeras tres filas describen el comportamiento anterior: las tres correcciones están aplicadas y publicadas. Consultar el estado de cada corrección más abajo.
 
 ### Hallazgos originales y criterios para una futura corrección
 
@@ -47,13 +47,13 @@ La compilación y las cuatro pruebas actuales pasan, pero esas pruebas solo cubr
 
 ### Estado de las correcciones (2026-10-25)
 
-La corrección del alta está **publicada** en Supabase como `affiliate-admin-user` **v19** (2026-10-25 15:40 UTC, `verify_jwt = true`). El **conteo está aplicado** en producción con la migración `20261025000000` (2026-10-25), registrada en el historial. El **outbox sigue sin aplicar ni publicar**: la migración `20261025010000` no está registrada y `send-affiliate-notifications` sigue en v16.
+La corrección del alta está **publicada** en Supabase como `affiliate-admin-user` **v19** (2026-10-25 15:40 UTC, `verify_jwt = true`). El **conteo está aplicado** con la migración `20261025000000`. El **outbox está aplicado y publicado**: migración `20261025010000` registrada y `send-affiliate-notifications` **v17** (`verify_jwt = false`), con el envío real de correo pendiente de verificar.
 
 | Corrección | Archivos | Estado |
 |---|---|---|
 | Validación y compensación de altas | `affiliate-admin-user/index.ts` y `core.mjs` | **Publicada** (v19) |
 | Conteo sin multiplicación por etapas | migración `20261025000000` | **Publicada** (vista corregida y registrada) |
-| Reclamación y recuperación del outbox | migración `20261025010000` y `send-affiliate-notifications/*` | Pendiente de aplicar y publicar |
+| Reclamación y recuperación del outbox | migración `20261025010000` y `send-affiliate-notifications/*` | **Publicada** (v17), correo real pendiente |
 
 **Publicación del alta.** Incluye dos defectos encontrados en la revisión previa: el JSON malformado ahora se rechaza con 400 (`parsearCuerpo`) y las compensaciones incompletas se registran con `COMPENSATION_PARTIAL` desde el adaptador. El contrato del frontend no cambió: `201 {id, username, role}` en éxito y `{error}` en error; `compensacion_incompleta` solo aparece si la compensación falla.
 
@@ -61,11 +61,17 @@ La corrección del alta está **publicada** en Supabase como `affiliate-admin-us
 
 **Publicación del conteo.** La migración `20261025000000` se aplicó con la API de administración y se registró en `supabase_migrations.schema_migrations`; la `20261025010000` no se tocó. La vista conserva columnas, tipos, `security_invoker`, propietario y privilegios, y solo cambió el cálculo. Se probó en producción con seis clientes sintéticos: 2×2→2, 3×2→3, 2×1→2, 2×0→2, 0×2→0 y 1 pagada + 1 pendiente→1, con `last_paid_at` y etapas correctos. La limpieza dejó cero registros en las ocho tablas implicadas. La definición anterior exacta y la restauración están en `work/cambio-20261025/vista-antes.sql` y en EVIDENCIAS.md.
 
+**Publicación del outbox.** La migración `20261025010000` se aplicó y registró: columnas `claimed_at`/`claim_expires_at`/`claim_token`, dos índices y la RPC de 3 argumentos, ejecutable solo por `service_role`. Se publicó `send-affiliate-notifications` **v17** con `verify_jwt = false` y autenticación por `x-cron-secret`. El código añade tiempo máximo por envío (10 s), presupuesto de lote (80 % del arriendo), cierre visible de las filas que agotan cinco intentos y respuesta `processed/sent/failed/late`. En producción se comprobó: 401 sin secreto, con secreto incorrecto y con secreto vacío; reclamación simultánea de 4 filas (unión 4, intersección 0, cuatro tokens distintos); rotación de token; marca con el token anterior 0 filas y con el vigente 1; recuperación de una fila sin arriendo; fila con cinco intentos cerrada como «intentos agotados»; quinto intento reclamado una vez y luego no reintentado; parámetros fuera de rango rechazados. Limpieza en cero en outbox, comisiones, periodos, afiliaciones, clientes, cupones y afiliados.
+
+**Idempotencia de Resend.** La documentación oficial acepta `Idempotency-Key` de 1–256 caracteres y deduplica durante **24 horas**: la misma clave con el mismo payload devuelve la misma respuesta sin reenviar, y con un payload distinto responde `409 invalid_idempotent_request`. No hay entrega «exactamente una vez»: fuera de la ventana de 24 h, o si cambia el payload, un reintento puede enviar de nuevo. El código usa el `id` del aviso como clave, que es estable entre reintentos.
+
 **Restauración.** El código desplegado de v18 se recuperó del bundle eszip y se conserva en `work/restauracion-v18/index.ts` (hash `9437875D…`), junto con el bundle íntegro. Esa copia difiere de `work/cambio-20261025/antes/` solo en la codificación de acentos y dos líneas en blanco. Para volver a v18: copiar ese `index.ts` sobre la función y desplegar; el `core.mjs` actual queda sin uso.
 
-**Limitaciones.** La migración de conteo está aplicada; la de outbox no, y `send-affiliate-notifications` sigue en v16. No se tocaron permisos, RLS, cron, modelos ni WhatsApp. El alta quedó en `6abf294`. Los cambios de esta etapa se publicaron en `main` en el commit `d85fdc` mediante la API de GitHub; como esta sesión no tiene binario de `git`, las referencias locales no se actualizaron y quedan pendientes de un `fetch`.
+**Restauración del outbox.** El fuente desplegado de v16 se recuperó del bundle y está en `work/restauracion-v16/index.ts` (hash `1525D2BE…`), con el bundle íntegro. Para revertir: pausar invocaciones, copiar ese `index.ts`, desplegar y **conservar** las columnas, los índices y las filas; no hace falta borrar el esquema ni el historial.
 
-La batería conjunta reportó **18 aprobadas / 11 fallidas antes** y **29 / 0 después** (alta, conteo y outbox). La revisión posterior ejecutó además las **13/13 pruebas específicas del alta**; no son 29 pruebas exclusivas del alta. El portal pasó **4/4 pruebas**, TypeScript y Vite. Estas comprobaciones no certifican todo el negocio financiero.
+**Limitaciones.** El envío real de correo no se verificó: entre los secretos del proyecto no están `AFFILIATE_CRON_SECRET` ni `RESEND_API_KEY`, y no hay un destinatario de pruebas autorizado. Sin `AFFILIATE_CRON_SECRET` la función rechaza toda invocación (401), así que tampoco se pudo probar el camino con secreto válido ni la respuesta `processed/sent/failed/late` desde el endpoint. No se tocaron permisos, RLS, cron, modelos ni WhatsApp. Alta en `6abf294`; conteo en `d85fdc`; el outbox se publica en un commit posterior de `main`. Las referencias locales de git siguen pendientes de `fetch` porque esta sesión no tiene el binario.
+
+La batería conjunta reportó **24 aprobadas / 11 fallidas antes** y **35 / 0 después** (alta, conteo y outbox). La revisión posterior ejecutó además las **13/13 pruebas específicas del alta**; no son 35 pruebas exclusivas del alta. El portal pasó **4/4 pruebas**, TypeScript y Vite. Estas comprobaciones no certifican todo el negocio financiero.
 
 Las **39/39 comprobaciones adicionales** pertenecen a un ensayo embebido con tablas sintéticas, sustituto de Auth y privilegios preparados para las pruebas. Ejerce RLS de PostgreSQL, pero no reproduce por sí solo Auth, la API o el correo reales. La visibilidad de `clientes` allí no acredita los grants de producción. La entrega posterior registra RLS desactivado en producción, pero deja sus privilegios efectivos y alcance de acceso pendientes de comprobar.
 
@@ -89,7 +95,7 @@ Los originales y scripts de reversión se conservan; no se ejecutaron. Tampoco s
 | `src/components/`, `src/styles.css` | Presentación y navegación compartidas. |
 | `src/lib/supabase.ts`, `src/types.ts` | Cliente Supabase, traducción de usuario a identidad interna y tipos de interfaz. |
 | `src/lib/format.ts`, `format.test.ts` | Formatos MXN/fechas/estados y cuatro pruebas de presentación. |
-| `supabase/migrations/` | Cinco migraciones anteriores, la corrección de conteo **aplicada** y la de outbox **sin aplicar**; conservar nombre, orden y contenido. |
+| `supabase/migrations/` | Cinco migraciones anteriores y las dos correcciones **aplicadas** (conteo y outbox); conservar nombre, orden y contenido. |
 | `supabase/functions/affiliate-admin-user/` | Alta administrativa de usuarios, afiliados, cupón y etapas. |
 | `supabase/functions/send-affiliate-notifications/` | Procesamiento de avisos por correo desde el outbox. |
 | `supabase/config.toml` | Proyecto y verificación JWT de funciones. |
@@ -139,7 +145,7 @@ El modo operativo requiere una URL y clave válidas. El cliente se crea también
 
 En Supabase, las funciones requieren `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` en servidor. Los avisos usan además `RESEND_API_KEY`, `AFFILIATE_EMAIL_FROM` y `AFFILIATE_CRON_SECRET`. Estos secretos no pertenecen al ejemplo del frontend ni a variables `VITE_*`. El ejemplo se dejó solo con configuración pública; los archivos reales no se editaron.
 
-El procesador de avisos acepta además, con estos valores predeterminados: `AFFILIATE_OUTBOX_BATCH` (20, entre 1 y 100), `AFFILIATE_OUTBOX_LEASE_SECONDS` (300, entre 1 y 3600) y `AFFILIATE_OUTBOX_LEGACY_GRACE_SECONDS` (900, entre 0 y 86400). La función valida los rangos en la base y rechaza valores fuera de ellos.
+El procesador de avisos acepta además, con estos valores predeterminados: `AFFILIATE_OUTBOX_BATCH` (20, entre 1 y 100), `AFFILIATE_OUTBOX_LEASE_SECONDS` (300, entre 1 y 3600), `AFFILIATE_OUTBOX_LEGACY_GRACE_SECONDS` (900, entre 0 y 86400), `AFFILIATE_OUTBOX_SEND_TIMEOUT_MS` (10000, entre 1000 y 30000) y `AFFILIATE_OUTBOX_MAX_RUN_SECONDS` (240, entre 5 y 3600; el lote se corta al 80 % del arriendo). La función valida los rangos y rechaza valores fuera de ellos.
 
 `CREDENCIALES.txt` no es leído por el código. Se conservó en `RECUERDO/CREDENCIALES.txt`, con el mismo contenido y permisos, sin mostrarlo ni copiar sus valores al README. El archivo histórico, evidencias, variables privadas y metadatos locales quedan excluidos de Git. Mantenerlos también fuera de contextos de publicación.
 
@@ -177,7 +183,7 @@ La especificación prevé corte mensual y pago manual del disponible entre días
 
 ## Funciones y programación
 
-Las RPC locales incluyen `assign_affiliate_coupon`, `assign_affiliate_late`, `create_billing_period`, `register_client_payment`, `annul_client_payment`, `replace_client_commission_tiers`, `create_affiliate_payout` y `release_due_commissions`. Las cinco migraciones anteriores se conservaron; de las dos nuevas, la de conteo está aplicada y la de outbox no. No asumir que los historiales locales pueden ejecutarse en bloque contra el esquema remoto.
+Las RPC locales incluyen `assign_affiliate_coupon`, `assign_affiliate_late`, `create_billing_period`, `register_client_payment`, `annul_client_payment`, `replace_client_commission_tiers`, `create_affiliate_payout` y `release_due_commissions`. Las cinco migraciones anteriores se conservaron; de las dos nuevas, ambas están aplicadas. No asumir que los historiales locales pueden ejecutarse en bloque contra el esquema remoto.
 
 `affiliate-admin-user` tiene verificación JWT declarada y comprueba además la sesión y el rol dentro de la función. `send-affiliate-notifications` tiene `verify_jwt = false` y exige `x-cron-secret` igual a `AFFILIATE_CRON_SECRET`; esto no lo convierte en un endpoint público sin autenticación.
 
