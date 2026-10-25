@@ -1,15 +1,22 @@
--- Identidad de reclamación y recuperación de avisos antiguos.
--- Segunda migración local del arreglo del outbox. No modifica las anteriores.
+-- Outbox: infraestructura completa de reclamación con arriendo y token.
 --
--- 1) `claim_token`: cada reclamación emite un token. Las marcas de enviado o
---    fallido exigen ese token, de modo que un worker cuyo arriendo venció y fue
---    reemplazado no puede sobrescribir el estado del nuevo dueño.
--- 2) Avisos en 'processing' sin arriendo (filas anteriores a esta migración o
---    de una caída antes de existir la columna): se recuperan cuando superan una
---    gracia configurable, por omisión 900 s desde su creación.
+-- Alcance: SOLO el outbox. No toca la vista (20261025000000) ni migraciones
+-- anteriores. Es ejecutable por sí misma, después de la primera.
+--
+-- 1) Columnas de arriendo (`claimed_at`, `claim_expires_at`) y token.
+-- 2) Índices de reclamación y de token.
+-- 3) RPC definitiva de 3 argumentos: `for update skip locked`, incremento de
+--    `attempts` en la misma operación, arriendo configurable, recuperación de
+--    filas vencidas y de filas antiguas en 'processing' sin arriendo, y tope
+--    implícito de 5 intentos.
 
 alter table public.affiliate_notification_outbox
+  add column if not exists claimed_at timestamptz,
+  add column if not exists claim_expires_at timestamptz,
   add column if not exists claim_token uuid;
+
+create index if not exists affiliate_notification_outbox_claim_idx
+  on public.affiliate_notification_outbox (status, claim_expires_at, created_at);
 
 create index if not exists affiliate_notification_outbox_token_idx
   on public.affiliate_notification_outbox (claim_token);
@@ -18,7 +25,7 @@ create index if not exists affiliate_notification_outbox_token_idx
 -- ignore el token y la gracia.
 drop function if exists public.claim_affiliate_notifications(integer, integer);
 
-create function public.claim_affiliate_notifications(
+create or replace function public.claim_affiliate_notifications(
   p_limit integer default 20,
   p_lease_seconds integer default 300,
   p_legacy_grace_seconds integer default 900

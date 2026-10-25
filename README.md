@@ -11,7 +11,7 @@ El objetivo es conservar un proyecto ordenado, comprensible y coordinado. La lim
 | Parte | Estado |
 |---|---|
 | Limpieza del 24-oct | Seis archivos archivados, tres originales conservados y nueve registros verificados en [RECUERDO/INVENTARIO.csv](RECUERDO/INVENTARIO.csv). |
-| Código actual en disco | El alta corregida está publicada como v19. Las dos migraciones y la función de avisos corregida siguen pendientes. No asumir que todo `supabase/` coincide con producción. |
+| Código actual en disco | El alta está publicada como v19 y el conteo aplicado (migración `20261025000000`). La migración de outbox y la función de avisos corregida siguen pendientes. No asumir que todo `supabase/` coincide con producción. |
 | Versión anterior | Los dos `index.ts` originales están conservados y verificados contra las huellas anteriores al cambio. No se restauraron. |
 | Producción | Alta v19 activa, con `verify_jwt=true`, confirmada en Supabase. Avisos v16. Las pruebas sintéticas publicadas se documentan abajo; no certifican todo el módulo financiero. |
 | Trabajo futuro | Las correcciones y su despliegue requieren una tarea separada. No instalar entornos en esta PC; una futura validación integrada será en la nube. |
@@ -47,21 +47,23 @@ La compilación y las cuatro pruebas actuales pasan, pero esas pruebas solo cubr
 
 ### Estado de las correcciones (2026-10-25)
 
-La corrección del alta está **publicada** en Supabase como `affiliate-admin-user` **v19** (2026-10-25 15:40 UTC, `verify_jwt = true`). Las correcciones de conteo y outbox **siguen sin publicar**: sus dos migraciones no se aplicaron y `send-affiliate-notifications` sigue en v16.
+La corrección del alta está **publicada** en Supabase como `affiliate-admin-user` **v19** (2026-10-25 15:40 UTC, `verify_jwt = true`). El **conteo está aplicado** en producción con la migración `20261025000000` (2026-10-25), registrada en el historial. El **outbox sigue sin aplicar ni publicar**: la migración `20261025010000` no está registrada y `send-affiliate-notifications` sigue en v16.
 
 | Corrección | Archivos | Estado |
 |---|---|---|
 | Validación y compensación de altas | `affiliate-admin-user/index.ts` y `core.mjs` | **Publicada** (v19) |
-| Conteo sin multiplicación por etapas | migración `20261025000000` | Pendiente de aplicar |
+| Conteo sin multiplicación por etapas | migración `20261025000000` | **Publicada** (vista corregida y registrada) |
 | Reclamación y recuperación del outbox | migración `20261025010000` y `send-affiliate-notifications/*` | Pendiente de aplicar y publicar |
 
 **Publicación del alta.** Incluye dos defectos encontrados en la revisión previa: el JSON malformado ahora se rechaza con 400 (`parsearCuerpo`) y las compensaciones incompletas se registran con `COMPENSATION_PARTIAL` desde el adaptador. El contrato del frontend no cambió: `201 {id, username, role}` en éxito y `{error}` en error; `compensacion_incompleta` solo aparece si la compensación falla.
 
 **Pruebas de la publicación.** Contra la función publicada se ejecutaron diez comprobaciones con usuarios sintéticos: 401 sin sesión, 403 sin rol admin, 400 por JSON malformado, 400 sin etapas y con etapas inválidas, 201 en alta válida, 400 por usuario duplicado, registros 1/1/1/1/2 y limpieza 0/0/0/0. Evidencia en `work/prueba-publicada/resultado.json`. Los recursos sintéticos se eliminaron y se verificó que no quedaran restos.
 
+**Publicación del conteo.** La migración `20261025000000` se aplicó con la API de administración y se registró en `supabase_migrations.schema_migrations`; la `20261025010000` no se tocó. La vista conserva columnas, tipos, `security_invoker`, propietario y privilegios, y solo cambió el cálculo. Se probó en producción con seis clientes sintéticos: 2×2→2, 3×2→3, 2×1→2, 2×0→2, 0×2→0 y 1 pagada + 1 pendiente→1, con `last_paid_at` y etapas correctos. La limpieza dejó cero registros en las ocho tablas implicadas. La definición anterior exacta y la restauración están en `work/cambio-20261025/vista-antes.sql` y en EVIDENCIAS.md.
+
 **Restauración.** El código desplegado de v18 se recuperó del bundle eszip y se conserva en `work/restauracion-v18/index.ts` (hash `9437875D…`), junto con el bundle íntegro. Esa copia difiere de `work/cambio-20261025/antes/` solo en la codificación de acentos y dos líneas en blanco. Para volver a v18: copiar ese `index.ts` sobre la función y desplegar; el `core.mjs` actual queda sin uso.
 
-**Limitaciones.** Las migraciones de conteo y outbox no se aplicaron; no se publicó `send-affiliate-notifications`; no se tocaron permisos, cron, modelos ni WhatsApp. Git está disponible en la sesión de cierre. Se verificó directamente que GitHub `main` ya estaba en `4bede97`; la referencia antigua del informe no describía el remoto actual. Esta publicación del alta se registra en un commit posterior sobre `main`.
+**Limitaciones.** La migración de conteo está aplicada; la de outbox no, y `send-affiliate-notifications` sigue en v16. No se tocaron permisos, RLS, cron, modelos ni WhatsApp. El alta quedó registrada en el commit `6abf294`. En la sesión del conteo no hay binario de `git`: el commit de esta etapa (dos migraciones y este README) queda pendiente de guardar y subir.
 
 La batería conjunta reportó **18 aprobadas / 11 fallidas antes** y **29 / 0 después** (alta, conteo y outbox). La revisión posterior ejecutó además las **13/13 pruebas específicas del alta**; no son 29 pruebas exclusivas del alta. El portal pasó **4/4 pruebas**, TypeScript y Vite. Estas comprobaciones no certifican todo el negocio financiero.
 
@@ -87,7 +89,7 @@ Los originales y scripts de reversión se conservan; no se ejecutaron. Tampoco s
 | `src/components/`, `src/styles.css` | Presentación y navegación compartidas. |
 | `src/lib/supabase.ts`, `src/types.ts` | Cliente Supabase, traducción de usuario a identidad interna y tipos de interfaz. |
 | `src/lib/format.ts`, `format.test.ts` | Formatos MXN/fechas/estados y cuatro pruebas de presentación. |
-| `supabase/migrations/` | Cinco migraciones anteriores y dos correcciones locales no aplicadas; conservar nombre, orden y contenido. |
+| `supabase/migrations/` | Cinco migraciones anteriores, la corrección de conteo **aplicada** y la de outbox **sin aplicar**; conservar nombre, orden y contenido. |
 | `supabase/functions/affiliate-admin-user/` | Alta administrativa de usuarios, afiliados, cupón y etapas. |
 | `supabase/functions/send-affiliate-notifications/` | Procesamiento de avisos por correo desde el outbox. |
 | `supabase/config.toml` | Proyecto y verificación JWT de funciones. |
@@ -175,7 +177,7 @@ La especificación prevé corte mensual y pago manual del disponible entre días
 
 ## Funciones y programación
 
-Las RPC locales incluyen `assign_affiliate_coupon`, `assign_affiliate_late`, `create_billing_period`, `register_client_payment`, `annul_client_payment`, `replace_client_commission_tiers`, `create_affiliate_payout` y `release_due_commissions`. Las cinco migraciones anteriores se conservaron; las dos nuevas son propuestas locales no aplicadas. No asumir que los historiales locales pueden ejecutarse en bloque contra el esquema remoto.
+Las RPC locales incluyen `assign_affiliate_coupon`, `assign_affiliate_late`, `create_billing_period`, `register_client_payment`, `annul_client_payment`, `replace_client_commission_tiers`, `create_affiliate_payout` y `release_due_commissions`. Las cinco migraciones anteriores se conservaron; de las dos nuevas, la de conteo está aplicada y la de outbox no. No asumir que los historiales locales pueden ejecutarse en bloque contra el esquema remoto.
 
 `affiliate-admin-user` tiene verificación JWT declarada y comprueba además la sesión y el rol dentro de la función. `send-affiliate-notifications` tiene `verify_jwt = false` y exige `x-cron-secret` igual a `AFFILIATE_CRON_SECRET`; esto no lo convierte en un endpoint público sin autenticación.
 
