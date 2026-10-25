@@ -14,9 +14,22 @@ El objetivo es conservar un proyecto ordenado, comprensible y coordinado. La lim
 | Código actual en disco | Alta v19, conteo aplicado (migración `20261025000000`) y outbox aplicado (migración `20261025010000`, función v17). El envío real de correo sigue pendiente de verificar. No asumir que todo `supabase/` coincide con producción. |
 | Versión anterior | Los dos `index.ts` originales están conservados y verificados contra las huellas anteriores al cambio. No se restauraron. |
 | Producción | Alta v19 activa, con `verify_jwt=true`, confirmada en Supabase. Avisos v17, con `verify_jwt=false`. Las pruebas sintéticas publicadas se documentan abajo; no certifican todo el módulo financiero. |
-| Trabajo futuro | Las correcciones y su despliegue requieren una tarea separada. No instalar entornos en esta PC; una futura validación integrada será en la nube. |
+| Trabajo futuro | Las tres correcciones están publicadas. Falta habilitar y comprobar el correo y su ejecución periódica, según la lista siguiente. No instalar entornos en esta PC. |
 
 El [inventario funcional y los originales](work/cambio-20261025/EVIDENCIAS.md) distinguen ambas versiones sin perder trabajo. No ejecutar `db push`, migraciones ni scripts de reversión como parte de la limpieza.
+
+## Próximo trabajo: habilitar los avisos por correo
+
+**Estado al 25 de octubre de 2026:** outbox y función v17 publicados. **Los avisos automáticos todavía no están operativos:** la entrega de publicación registró ausencia de `AFFILIATE_CRON_SECRET` y `RESEND_API_KEY`, no se envió correo real y no se identificó un programador de esta función. Volver a comprobar estos requisitos al retomar.
+
+1. **Configurar el acceso en Supabase.** Generar un `AFFILIATE_CRON_SECRET` privado y configurar `RESEND_API_KEY` válida en los secretos del proyecto. No incluir valores en Git, documentación, frontend ni mensajes de chat.
+2. **Confirmar remitente y destinatario de prueba.** Configurar `AFFILIATE_EMAIL_FROM` con un remitente autorizado por Resend. Obtener del propietario una dirección de pruebas autorizada; no usar destinatarios de clientes. No confiar en el remitente predeterminado sin verificarlo.
+3. **Probar la función publicada manualmente.** Invocar `send-affiliate-notifications` con la cabecera `x-cron-secret` válida. Comprobar respuesta `processed/sent/failed/late`, recepción real del aviso sintético, estado `sent` y registros sin secretos. La comprobación con secreto válido y el envío real aún están pendientes.
+4. **Verificar reintentos e idempotencia.** Probar de forma controlada fallos, recuperación y respuesta del proveedor a la misma clave y contenido. Documentar su ventana de idempotencia y límites: no prometer entrega exactamente una vez. Conservar evidencia y limpiar solo los datos sintéticos creados.
+5. **Configurar una única ejecución periódica.** Elegir el programador y la frecuencia, proteger el secreto de la llamada y registrar dónde se administra, cómo se pausa y cómo se comprueba su última ejecución. Revisar programadores existentes antes de crear otro. La tarea `simular_ventas_demo_diarias` registrada durante la revisión es ajena a los avisos y no debe modificarse para habilitarlos.
+6. **Cerrar la habilitación.** Comprobar una ejecución automática exitosa y recepción real; registrar fecha, configuración sin valores secretos y resultados en este README y en la [evidencia existente](work/cambio-20261025/EVIDENCIAS.md). Definir cómo revisar avisos fallidos o con cinco intentos agotados.
+
+**Criterio de cierre:** autenticación válida comprobada, correo recibido en la bandeja autorizada, estados y reintentos verificados y programador único funcionando. Hasta entonces, describir el correo como pendiente de habilitación, aunque la función aparezca activa. Esta lista no habilita servicios por sí misma. La programación de `release_due_commissions` es un pendiente distinto y debe revisarse por separado.
 
 ## Responsabilidades y coordinación
 
@@ -145,7 +158,7 @@ El modo operativo requiere una URL y clave válidas. El cliente se crea también
 
 En Supabase, las funciones requieren `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` en servidor. Los avisos usan además `RESEND_API_KEY`, `AFFILIATE_EMAIL_FROM` y `AFFILIATE_CRON_SECRET`. Estos secretos no pertenecen al ejemplo del frontend ni a variables `VITE_*`. El ejemplo se dejó solo con configuración pública; los archivos reales no se editaron.
 
-El procesador de avisos acepta además, con estos valores predeterminados: `AFFILIATE_OUTBOX_BATCH` (20, entre 1 y 100), `AFFILIATE_OUTBOX_LEASE_SECONDS` (300, entre 1 y 3600), `AFFILIATE_OUTBOX_LEGACY_GRACE_SECONDS` (900, entre 0 y 86400), `AFFILIATE_OUTBOX_SEND_TIMEOUT_MS` (10000, entre 1000 y 30000) y `AFFILIATE_OUTBOX_MAX_RUN_SECONDS` (240, entre 5 y 3600; el lote se corta al 80 % del arriendo). La función valida los rangos y rechaza valores fuera de ellos.
+El procesador de avisos acepta además, con estos valores predeterminados: `AFFILIATE_OUTBOX_BATCH` (20, entre 1 y 100), `AFFILIATE_OUTBOX_LEASE_SECONDS` (300, entre 1 y 3600), `AFFILIATE_OUTBOX_LEGACY_GRACE_SECONDS` (900, entre 0 y 86400), `AFFILIATE_OUTBOX_SEND_TIMEOUT_MS` (10000, entre 1000 y 30000) y `AFFILIATE_OUTBOX_MAX_RUN_SECONDS` (240, entre 5 y 3600; el lote se corta al 80 % del arriendo). El adaptador usa los valores predeterminados cuando la configuración no es válida; la RPC rechaza argumentos fuera de sus rangos.
 
 `CREDENCIALES.txt` no es leído por el código. Se conservó en `RECUERDO/CREDENCIALES.txt`, con el mismo contenido y permisos, sin mostrarlo ni copiar sus valores al README. El archivo histórico, evidencias, variables privadas y metadatos locales quedan excluidos de Git. Mantenerlos también fuera de contextos de publicación.
 
@@ -187,7 +200,7 @@ Las RPC locales incluyen `assign_affiliate_coupon`, `assign_affiliate_late`, `cr
 
 `affiliate-admin-user` tiene verificación JWT declarada y comprueba además la sesión y el rol dentro de la función. `send-affiliate-notifications` tiene `verify_jwt = false` y exige `x-cron-secret` igual a `AFFILIATE_CRON_SECRET`; esto no lo convierte en un endpoint público sin autenticación.
 
-El código local reclama avisos mediante la nueva RPC, con token y arriendo; el lote predeterminado es 20 y el máximo de intentos es cinco. Según la entrega documentada, producción conserva el procesador anterior sin esa RPC. Debe configurarse el dominio remitente y el secreto en el servidor; no se comprobó que estén listos. La liberación de comisiones necesita programación administrativa o de servidor. No se creó ni se activó un cron durante esta revisión.
+El código local y la función publicada v17 reclaman avisos mediante la nueva RPC, con token y arriendo; el lote predeterminado es 20 y el máximo de intentos es cinco. La migración `20261025010000` está aplicada. Lo pendiente es habilitar secretos, remitente, entrega real y ejecución periódica, siguiendo la lista inicial. La liberación de comisiones necesita su propia programación administrativa o de servidor; no se creó ni se activó un cron durante esta revisión.
 
 La configuración original señalaba que staging y producción comparten proyecto Supabase. No asumir aislamiento de datos solo por usar otro dominio o `VITE_APP_ENV=staging`; verificar un entorno de prueba adecuado antes de ejecutar la matriz financiera.
 
