@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "npm:@supabase/supabase-js@2.50.0"
+import { validarAlta, ejecutarAlta } from "./core.mjs"
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -7,7 +8,6 @@ const cors = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 }
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } })
-const internalEmail = (username: string) => `${username.trim().toLocaleLowerCase("es-MX").replace(/[^a-z0-9._-]/g, "")}@afiliados.llantera.digital`
 
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: cors })
@@ -25,53 +25,37 @@ Deno.serve(async (request) => {
   if (profile?.role !== "admin" || !profile.is_active) return json({ error: "Acceso denegado" }, 403)
 
   const body = await request.json()
-  const username = String(body.username ?? "").trim()
-  const password = String(body.password ?? "")
-  const role = body.role === "admin" ? "admin" : "affiliate"
-  let affiliateId = role === "affiliate" ? String(body.affiliate_id ?? "") : null
-  if (!/^[a-zA-Z0-9._-]{3,40}$/.test(username) || password.length < 8) {
-    return json({ error: "Datos de usuario inválidos" }, 400)
+  // Se valida el cuerpo completo antes de escribir cualquier cosa.
+  const validacion = validarAlta(body)
+  if (!validacion.ok) return json({ error: validacion.error }, 400)
+
+  // Los adaptadores convierten los errores de Supabase en excepciones, para que
+  // el núcleo tenga un solo camino de error y pueda compensar.
+  const exigir = (error: { message: string } | null) => { if (error) throw new Error(error.message) }
+  const deps = {
+    crearUsuario: async (datos: { email: string; password: string; role: string }) => {
+      const { data, error } = await admin.auth.admin.createUser({
+        email: datos.email, password: datos.password, email_confirm: true,
+        app_metadata: { portal: "affiliates", role: datos.role },
+      })
+      if (error || !data.user) throw new Error(error?.message ?? "No se creó el usuario")
+      return { id: data.user.id }
+    },
+    borrarUsuario: async (id: string) => { const { error } = await admin.auth.admin.deleteUser(id); exigir(error) },
+    crearAfiliado: async (datos: Record<string, unknown>) => {
+      const { data, error } = await admin.from("affiliates").insert(datos).select("id").single()
+      if (error || !data) throw new Error(error?.message ?? "No se creó el afiliado")
+      return { id: data.id }
+    },
+    borrarAfiliado: async (id: string) => { const { error } = await admin.from("affiliates").delete().eq("id", id); exigir(error) },
+    crearPerfil: async (datos: Record<string, unknown>) => { const { error } = await admin.from("affiliate_portal_users").insert(datos); exigir(error) },
+    borrarPerfil: async (id: string) => { const { error } = await admin.from("affiliate_portal_users").delete().eq("auth_user_id", id); exigir(error) },
+    crearCupon: async (datos: Record<string, unknown>) => { const { error } = await admin.from("affiliate_coupons").insert(datos); exigir(error) },
+    borrarCuponesDeAfiliado: async (id: string) => { const { error } = await admin.from("affiliate_coupons").delete().eq("affiliate_id", id); exigir(error) },
+    crearEtapas: async (filas: Record<string, unknown>[]) => { const { error } = await admin.from("affiliate_default_commission_tiers").insert(filas); exigir(error) },
+    borrarEtapasDeAfiliado: async (id: string) => { const { error } = await admin.from("affiliate_default_commission_tiers").delete().eq("affiliate_id", id); exigir(error) },
   }
 
-  const { data: created, error: createError } = await admin.auth.admin.createUser({
-    email: internalEmail(username), password, email_confirm: true,
-    app_metadata: { portal: "affiliates", role },
-  })
-  if (createError || !created.user) return json({ error: createError?.message ?? "No se creó el usuario" }, 400)
-
-  if (role === "affiliate" && !affiliateId) {
-    const { data: affiliate, error: affiliateError } = await admin.from("affiliates").insert({
-      name: String(body.name ?? "").trim(), email: String(body.email ?? "").trim(),
-      default_discount_amount: Number(body.discount_amount ?? 0),
-    }).select("id").single()
-    if (affiliateError || !affiliate) { await admin.auth.admin.deleteUser(created.user.id); return json({ error: affiliateError?.message ?? "No se creó el afiliado" }, 400) }
-    affiliateId = affiliate.id
-  }
-
-  const { error: profileError } = await admin.from("affiliate_portal_users").insert({
-    auth_user_id: created.user.id, username, role, affiliate_id: affiliateId,
-  })
-  if (profileError) {
-    if (affiliateId && !body.affiliate_id) await admin.from("affiliates").delete().eq("id", affiliateId)
-    await admin.auth.admin.deleteUser(created.user.id)
-    return json({ error: profileError.message }, 400)
-  }
-
-  if (role === "affiliate" && !body.affiliate_id) {
-    const discount = Number(body.discount_amount ?? 0)
-    const { error: couponError } = await admin.from("affiliate_coupons").insert({ affiliate_id: affiliateId, code: String(body.coupon ?? ""), discount_amount: discount })
-    const { error: tiersError } = await admin.from("affiliate_default_commission_tiers").insert(body.tiers.map((tier: Record<string, unknown>) => ({
-      affiliate_id: affiliateId, start_payment_number: tier.start, end_payment_number: tier.end,
-      commission_rate: tier.rate, is_indefinite: Boolean(tier.indefinite),
-    })))
-    if (couponError || tiersError) {
-      await admin.from("affiliate_coupons").delete().eq("affiliate_id", affiliateId)
-      await admin.from("affiliate_default_commission_tiers").delete().eq("affiliate_id", affiliateId)
-      await admin.from("affiliate_portal_users").delete().eq("auth_user_id", created.user.id)
-      await admin.from("affiliates").delete().eq("id", affiliateId)
-      await admin.auth.admin.deleteUser(created.user.id)
-      return json({ error: couponError?.message ?? tiersError?.message }, 400)
-    }
-  }
-  return json({ id: created.user.id, username, role }, 201)
+  const resultado = await ejecutarAlta(deps, validacion.datos)
+  return json(resultado.body, resultado.status)
 })
