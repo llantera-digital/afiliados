@@ -63,7 +63,7 @@ La corrección del alta está **publicada** en Supabase como `affiliate-admin-us
 
 **Restauración.** El código desplegado de v18 se recuperó del bundle eszip y se conserva en `work/restauracion-v18/index.ts` (hash `9437875D…`), junto con el bundle íntegro. Esa copia difiere de `work/cambio-20261025/antes/` solo en la codificación de acentos y dos líneas en blanco. Para volver a v18: copiar ese `index.ts` sobre la función y desplegar; el `core.mjs` actual queda sin uso.
 
-**Limitaciones.** La migración de conteo está aplicada; la de outbox no, y `send-affiliate-notifications` sigue en v16. No se tocaron permisos, RLS, cron, modelos ni WhatsApp. El alta quedó registrada en el commit `6abf294`. En la sesión del conteo no hay binario de `git`: el commit de esta etapa (dos migraciones y este README) queda pendiente de guardar y subir.
+**Limitaciones.** La migración de conteo está aplicada; la de outbox no, y `send-affiliate-notifications` sigue en v16. No se tocaron permisos, RLS, cron, modelos ni WhatsApp. El alta quedó en `6abf294`. Los cambios de esta etapa se publicaron en `main` en el commit `d85fdc` mediante la API de GitHub; como esta sesión no tiene binario de `git`, las referencias locales no se actualizaron y quedan pendientes de un `fetch`.
 
 La batería conjunta reportó **18 aprobadas / 11 fallidas antes** y **29 / 0 después** (alta, conteo y outbox). La revisión posterior ejecutó además las **13/13 pruebas específicas del alta**; no son 29 pruebas exclusivas del alta. El portal pasó **4/4 pruebas**, TypeScript y Vite. Estas comprobaciones no certifican todo el negocio financiero.
 
