@@ -11,16 +11,16 @@ El objetivo es conservar un proyecto ordenado, comprensible y coordinado. La lim
 | Parte | Estado |
 |---|---|
 | Limpieza del 24-oct | Seis archivos archivados, tres originales conservados y nueve registros verificados en [RECUERDO/INVENTARIO.csv](RECUERDO/INVENTARIO.csv). |
-| Código actual en disco | Alta v19, conteo aplicado (migración `20261025000000`) y outbox aplicado (migración `20261025010000`, función v17). El envío real de correo sigue pendiente de verificar. No asumir que todo `supabase/` coincide con producción. |
+| Código actual en disco | Alta v20, conteo aplicado (migración `20261025000000`) y outbox aplicado (migración `20261025010000`, función v18). El envío real de correo sigue pendiente de verificar. No asumir que todo `supabase/` coincide con producción. |
 | Versión anterior | Los dos `index.ts` originales están conservados y verificados contra las huellas anteriores al cambio. No se restauraron. |
-| Producción | Alta v19 activa, con `verify_jwt=true`, confirmada en Supabase. Avisos v17, con `verify_jwt=false`. Las pruebas sintéticas publicadas se documentan abajo; no certifican todo el módulo financiero. |
+| Producción | Alta v20 activa, con `verify_jwt=true`, confirmada en Supabase. Avisos v18, con `verify_jwt=false`. Las pruebas sintéticas publicadas se documentan abajo; no certifican todo el módulo financiero. |
 | Trabajo futuro | Las tres correcciones están publicadas. Falta habilitar y comprobar el correo y su ejecución periódica, según la lista siguiente. No instalar entornos en esta PC. |
 
 El [inventario funcional y los originales](work/cambio-20261025/EVIDENCIAS.md) distinguen ambas versiones sin perder trabajo. No ejecutar `db push`, migraciones ni scripts de reversión como parte de la limpieza.
 
 ## Próximo trabajo: habilitar los avisos por correo
 
-**Estado al 25 de octubre de 2026:** outbox y función v17 publicados. **Los avisos automáticos todavía no están operativos:** la entrega de publicación registró ausencia de `AFFILIATE_CRON_SECRET` y `RESEND_API_KEY`, no se envió correo real y no se identificó un programador de esta función. Volver a comprobar estos requisitos al retomar.
+**Estado al 25 de octubre de 2026:** outbox y función v18 publicados. **Los avisos automáticos todavía no están operativos:** la entrega de publicación registró ausencia de `AFFILIATE_CRON_SECRET` y `RESEND_API_KEY`, no se envió correo real y no se identificó un programador de esta función. Volver a comprobar estos requisitos al retomar.
 
 1. **Configurar el acceso en Supabase.** Generar un `AFFILIATE_CRON_SECRET` privado y configurar `RESEND_API_KEY` válida en los secretos del proyecto. No incluir valores en Git, documentación, frontend ni mensajes de chat.
 2. **Confirmar remitente y destinatario de prueba.** Configurar `AFFILIATE_EMAIL_FROM` con un remitente autorizado por Resend. Obtener del propietario una dirección de pruebas autorizada; no usar destinatarios de clientes. No confiar en el remitente predeterminado sin verificarlo.
@@ -60,13 +60,13 @@ La compilación y las cuatro pruebas actuales pasan, pero esas pruebas solo cubr
 
 ### Estado de las correcciones (2026-10-25)
 
-La corrección del alta está **publicada** en Supabase como `affiliate-admin-user` **v19** (2026-10-25 15:40 UTC, `verify_jwt = true`). El **conteo está aplicado** con la migración `20261025000000`. El **outbox está aplicado y publicado**: migración `20261025010000` registrada y `send-affiliate-notifications` **v17** (`verify_jwt = false`), con el envío real de correo pendiente de verificar.
+La corrección del alta está **publicada** en Supabase como `affiliate-admin-user` **v20** (2026-10-25T09:40:47Z; hash `6959065e9eace765bdad0c72b837ff19dddf59a06bd0c9fa1d45c1cc27c7f31c`), con `verify_jwt = true`. El **conteo está aplicado** con la migración `20261025000000`. El **outbox está aplicado y publicado**: migración `20261025010000` registrada y `send-affiliate-notifications` **v18** (2026-10-25T10:25:54Z; hash `cd6a93826b0fd7904a0e1e2a553b9064dd85fa9bc156dfad2d6f191ab872d8c0`; `verify_jwt = false`), con el envío real de correo pendiente de verificar. La versión mayor no demuestra por sí sola un cambio funcional; los cuerpos desplegados son recuperables por la API, pero no se compararon en esta revisión.
 
 | Corrección | Archivos | Estado |
 |---|---|---|
-| Validación y compensación de altas | `affiliate-admin-user/index.ts` y `core.mjs` | **Publicada** (v19) |
+| Validación y compensación de altas | `affiliate-admin-user/index.ts` y `core.mjs` | **Publicada** (v20) |
 | Conteo sin multiplicación por etapas | migración `20261025000000` | **Publicada** (vista corregida y registrada) |
-| Reclamación y recuperación del outbox | migración `20261025010000` y `send-affiliate-notifications/*` | **Publicada** (v17), correo real pendiente |
+| Reclamación y recuperación del outbox | migración `20261025010000` y `send-affiliate-notifications/*` | **Publicada** (v18), correo real pendiente |
 
 **Publicación del alta.** Incluye dos defectos encontrados en la revisión previa: el JSON malformado ahora se rechaza con 400 (`parsearCuerpo`) y las compensaciones incompletas se registran con `COMPENSATION_PARTIAL` desde el adaptador. El contrato del frontend no cambió: `201 {id, username, role}` en éxito y `{error}` en error; `compensacion_incompleta` solo aparece si la compensación falla.
 
@@ -74,7 +74,7 @@ La corrección del alta está **publicada** en Supabase como `affiliate-admin-us
 
 **Publicación del conteo.** La migración `20261025000000` se aplicó con la API de administración y se registró en `supabase_migrations.schema_migrations`; la `20261025010000` no se tocó. La vista conserva columnas, tipos, `security_invoker`, propietario y privilegios, y solo cambió el cálculo. Se probó en producción con seis clientes sintéticos: 2×2→2, 3×2→3, 2×1→2, 2×0→2, 0×2→0 y 1 pagada + 1 pendiente→1, con `last_paid_at` y etapas correctos. La limpieza dejó cero registros en las ocho tablas implicadas. La definición anterior exacta y la restauración están en `work/cambio-20261025/vista-antes.sql` y en EVIDENCIAS.md.
 
-**Publicación del outbox.** La migración `20261025010000` se aplicó y registró: columnas `claimed_at`/`claim_expires_at`/`claim_token`, dos índices y la RPC de 3 argumentos, ejecutable solo por `service_role`. Se publicó `send-affiliate-notifications` **v17** con `verify_jwt = false` y autenticación por `x-cron-secret`. El código añade tiempo máximo por envío (10 s), presupuesto de lote (80 % del arriendo), cierre visible de las filas que agotan cinco intentos y respuesta `processed/sent/failed/late`. En producción se comprobó: 401 sin secreto, con secreto incorrecto y con secreto vacío; reclamación simultánea de 4 filas (unión 4, intersección 0, cuatro tokens distintos); rotación de token; marca con el token anterior 0 filas y con el vigente 1; recuperación de una fila sin arriendo; fila con cinco intentos cerrada como «intentos agotados»; quinto intento reclamado una vez y luego no reintentado; parámetros fuera de rango rechazados. Limpieza en cero en outbox, comisiones, periodos, afiliaciones, clientes, cupones y afiliados.
+**Publicación del outbox.** La migración `20261025010000` se aplicó y registró: columnas `claimed_at`/`claim_expires_at`/`claim_token`, dos índices y la RPC de 3 argumentos, ejecutable solo por `service_role`. Se publicó `send-affiliate-notifications` **v18** con `verify_jwt = false` y autenticación por `x-cron-secret`. El código añade tiempo máximo por envío (10 s), presupuesto de lote (80 % del arriendo), cierre visible de las filas que agotan cinco intentos y respuesta `processed/sent/failed/late`. En producción se comprobó: 401 sin secreto, con secreto incorrecto y con secreto vacío; reclamación simultánea de 4 filas (unión 4, intersección 0, cuatro tokens distintos); rotación de token; marca con el token anterior 0 filas y con el vigente 1; recuperación de una fila sin arriendo; fila con cinco intentos cerrada como «intentos agotados»; quinto intento reclamado una vez y luego no reintentado; parámetros fuera de rango rechazados. Limpieza en cero en outbox, comisiones, periodos, afiliaciones, clientes, cupones y afiliados.
 
 **Idempotencia de Resend.** La documentación oficial acepta `Idempotency-Key` de 1–256 caracteres y deduplica durante **24 horas**: la misma clave con el mismo payload devuelve la misma respuesta sin reenviar, y con un payload distinto responde `409 invalid_idempotent_request`. No hay entrega «exactamente una vez»: fuera de la ventana de 24 h, o si cambia el payload, un reintento puede enviar de nuevo. El código usa el `id` del aviso como clave, que es estable entre reintentos.
 
@@ -82,7 +82,7 @@ La corrección del alta está **publicada** en Supabase como `affiliate-admin-us
 
 **Restauración del outbox.** El fuente desplegado de v16 se recuperó del bundle y está en `work/restauracion-v16/index.ts` (hash `1525D2BE…`), con el bundle íntegro. Para revertir: pausar invocaciones, copiar ese `index.ts`, desplegar y **conservar** las columnas, los índices y las filas; no hace falta borrar el esquema ni el historial.
 
-**Limitaciones.** El envío real de correo no se verificó: entre los secretos del proyecto no están `AFFILIATE_CRON_SECRET` ni `RESEND_API_KEY`, y no hay un destinatario de pruebas autorizado. Sin `AFFILIATE_CRON_SECRET` la función rechaza toda invocación (401), así que tampoco se pudo probar el camino con secreto válido ni la respuesta `processed/sent/failed/late` desde el endpoint. No se tocaron permisos, RLS, cron, modelos ni WhatsApp. Alta en `6abf294`; conteo en `d85fdc`; el outbox se publica en un commit posterior de `main`. Las referencias locales de git siguen pendientes de `fetch` porque esta sesión no tiene el binario.
+**Limitaciones.** El envío real de correo no se verificó: entre los secretos del proyecto no están `AFFILIATE_CRON_SECRET` ni `RESEND_API_KEY`, y no hay un destinatario de pruebas autorizado. Sin `AFFILIATE_CRON_SECRET` la función rechaza toda invocación (401), así que tampoco se pudo probar el camino con secreto válido ni la respuesta `processed/sent/failed/late` desde el endpoint. No se tocaron permisos, RLS, cron, modelos ni WhatsApp. Alta en `6abf294`; conteo en `d85fdc`; el outbox se publica en un commit posterior de `main`. Git local y `origin/main` están sincronizados en `43b69d4`; esta comprobación no cambia la conclusión anterior sobre qué cuerpos están desplegados.
 
 La batería conjunta reportó **24 aprobadas / 11 fallidas antes** y **35 / 0 después** (alta, conteo y outbox). La revisión posterior ejecutó además las **13/13 pruebas específicas del alta**; no son 35 pruebas exclusivas del alta. El portal pasó **4/4 pruebas**, TypeScript y Vite. Estas comprobaciones no certifican todo el negocio financiero.
 
@@ -200,7 +200,7 @@ Las RPC locales incluyen `assign_affiliate_coupon`, `assign_affiliate_late`, `cr
 
 `affiliate-admin-user` tiene verificación JWT declarada y comprueba además la sesión y el rol dentro de la función. `send-affiliate-notifications` tiene `verify_jwt = false` y exige `x-cron-secret` igual a `AFFILIATE_CRON_SECRET`; esto no lo convierte en un endpoint público sin autenticación.
 
-El código local y la función publicada v17 reclaman avisos mediante la nueva RPC, con token y arriendo; el lote predeterminado es 20 y el máximo de intentos es cinco. La migración `20261025010000` está aplicada. Lo pendiente es habilitar secretos, remitente, entrega real y ejecución periódica, siguiendo la lista inicial. La liberación de comisiones necesita su propia programación administrativa o de servidor; no se creó ni se activó un cron durante esta revisión.
+El código local y la función publicada v18 reclaman avisos mediante la nueva RPC, con token y arriendo; el lote predeterminado es 20 y el máximo de intentos es cinco. La migración `20261025010000` está aplicada. Lo pendiente es habilitar secretos, remitente, entrega real y ejecución periódica, siguiendo la lista inicial. La liberación de comisiones necesita su propia programación administrativa o de servidor; no se creó ni se activó un cron durante esta revisión.
 
 La configuración original señalaba que staging y producción comparten proyecto Supabase. No asumir aislamiento de datos solo por usar otro dominio o `VITE_APP_ENV=staging`; verificar un entorno de prueba adecuado antes de ejecutar la matriz financiera.
 
@@ -227,6 +227,8 @@ Añadir casos del contador con varias etapas, estados de carga/error y ausencia 
 ## Alojamiento y resultado histórico de la limpieza del 24-oct
 
 Vercel conserva su vinculación en `.vercel/` y el fallback SPA de `vercel.json`. El build genera `dist/`. No se cambió el dominio, la vinculación o el destino remoto. Las funciones Supabase y las migraciones tienen despliegues independientes; no se publican con Vite.
+
+**Publicación y recuperación verificadas (26-oct):** el proyecto Vercel `afiliados-llantera-digital` está vinculado a GitHub `llantera-digital/afiliados`, productionBranch `main`. El deployment productivo actual es `dpl_AZGhAFwtfLqA6J5gz5oLFKi3so4A`, READY, source=git, commit `43b69d4`, con URL canónica **https://afiliados-llantera-digital.vercel.app**. Un push a `main` genera un deployment; las funciones y migraciones Supabase se publican por separado. Para recuperar el portal, promover en Vercel un deployment productivo anterior que esté READY; no se ejecutó esa promoción. No se dispone de un CLI Vercel instalado para documentar un comando local verificado.
 
 Se archivaron **seis archivos**: los tres documentos técnicos anteriores, la especificación original, el archivo manual de credenciales y un archivo demo sin referencias. Se preservaron **tres originales antes de editar**: README, reglas de Git y ejemplo de variables. Los **nueve registros** de `RECUERDO/INVENTARIO.csv` se verificaron por tamaño y SHA-256.
 
