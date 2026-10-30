@@ -2,7 +2,21 @@
 
 Portal independiente para administrar afiliados, cupones, mensualidades, comisiones y pagos, con una vista restringida para cada afiliado. Usa React 19, TypeScript estricto, Vite, Supabase Auth/Postgres/RLS, funciones Edge y avisos por Resend.
 
-**Raíz:** `C:\Llantera_Digital\06_AFILIADOS`. Documentación funcional al 25 de octubre de 2026 y última revisión documental el **28-oct-2026**. Este README es la entrada del componente; el [centro de control](../00_CONTROL_DEL_PROYECTO/README.md) explica su relación con los demás proyectos. Las fechas internas de cada publicación se conservan.
+**Raíz:** `C:\Llantera_Digital\06_AFILIADOS`. Documentación funcional al 25 de octubre de 2026 y última revisión documental el **30-oct-2026**. Este README es la entrada del componente; el [centro de control](../00_CONTROL_DEL_PROYECTO/README.md) explica su relación con los demás proyectos. Las fechas internas de cada publicación se conservan.
+
+## Modalidad comercial acordada — 30-oct-2026
+
+El propietario permite **dar altas aunque el correo automático todavía no esté
+operativo**. El programa tendrá un volumen bajo de afiliados seleccionados e
+invitados manualmente: dueños de grupos de llanteros, influencers del nicho y
+vendedores de herramientas o llantas al mayoreo.
+
+La captación y las altas serán gestionadas por el propietario; no se plantea un
+programa de inscripción abierta, de autoservicio o captación automatizada. El
+correo es una habilitación futura de avisos y **no bloquea las altas**. Esta
+decisión no cambia el procedimiento técnico de alta, la autenticación, las reglas
+de comisiones ni el estado técnico del correo, que sigue pendiente de configurar
+y probar.
 
 ## Estado y alcance
 
@@ -14,11 +28,14 @@ El objetivo es conservar un proyecto ordenado, comprensible y coordinado. La lim
 | Código actual en disco | Alta v20, conteo aplicado (migración `20261025000000`) y outbox aplicado (migración `20261025010000`, función v18). El envío real de correo sigue pendiente de verificar. No asumir que todo `supabase/` coincide con producción. |
 | Versión anterior | Los dos `index.ts` originales están conservados y verificados contra las huellas anteriores al cambio. No se restauraron. |
 | Producción | Alta v20 activa, con `verify_jwt=true`, confirmada en Supabase. Avisos v18, con `verify_jwt=false`. Las pruebas sintéticas publicadas se documentan abajo; no certifican todo el módulo financiero. |
-| Trabajo futuro | Las tres correcciones están publicadas. Falta habilitar y comprobar el correo y su ejecución periódica, según la lista siguiente. No instalar entornos en esta PC. |
+| Trabajo futuro | Las tres correcciones están publicadas. Falta habilitar y comprobar el correo y su ejecución periódica, según la lista siguiente; esto no bloquea las altas manuales acordadas. No instalar entornos en esta PC. |
 
 El inventario funcional y los originales están en `work/cambio-20261025/EVIDENCIAS.md` (evidencia local, no versionada) y distinguen ambas versiones sin perder trabajo. No ejecutar `db push`, migraciones ni scripts de reversión como parte de la limpieza.
 
 ## Próximo trabajo: habilitar los avisos por correo
+
+**Habilitación futura, no requisito para las altas manuales.** La lista siguiente
+describe cómo cerrar técnicamente el envío cuando se retome, no un bloqueo comercial.
 
 **Estado al 25 de octubre de 2026:** outbox y función v18 publicados. **Los avisos automáticos todavía no están operativos:** la entrega de publicación registró ausencia de `AFFILIATE_CRON_SECRET` y `RESEND_API_KEY`, no se envió correo real y no se identificó un programador de esta función. Volver a comprobar estos requisitos al retomar.
 
@@ -36,7 +53,7 @@ El inventario funcional y los originales están en `work/cambio-20261025/EVIDENC
 - `06` mantiene el portal de afiliados, sus reglas específicas y las funciones `affiliate-admin-user` y `send-affiliate-notifications`.
 - `public.clientes` y el proyecto Supabase son compartidos. Antes de modificar datos, permisos o esquema, revisar sus consumidores; no decidir únicamente desde este portal.
 - Las migraciones de `01`, `02`, `05` y `06` tienen historias solapadas. Se conservan: no borrar ni trasladar SQL por semejanza, ni asumir que una carpeta reconstruye toda la base.
-- El mapa de responsabilidades del centro de control describe las rutas actuales y decisiones pendientes. No se ha aprobado trasladar las funciones de `06` a `01`. El documento local `00_CONTROL_DEL_PROYECTO/15_mapa_fuentes_de_verdad.md` no está versionado; para una entrega, usar el README central.
+- El mapa de responsabilidades del centro de control describe las rutas actuales y decisiones pendientes. No se ha aprobado trasladar las funciones de `06` a `01`. El informe `00_CONTROL_DEL_PROYECTO/15_mapa_fuentes_de_verdad.md` está versionado como antecedente histórico; para el estado vigente, usar el README central y los README de los componentes.
 - `RECUERDO/` contiene antecedentes; `work/` contiene ensayos, evidencias y originales. Ninguno es otra copia activa del portal ni un paquete de publicación.
 
 ## Pendientes funcionales fuera del cierre de limpieza
