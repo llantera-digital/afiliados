@@ -4,6 +4,26 @@ Portal independiente para administrar afiliados, cupones, mensualidades, comisio
 
 **Raíz:** `C:\Llantera_Digital\06_AFILIADOS`. Documentación funcional al 25 de octubre de 2026 y última revisión documental el **30-oct-2026**. Este README es la entrada del componente; el [centro de control](../00_CONTROL_DEL_PROYECTO/README.md) explica su relación con los demás proyectos. Las fechas internas de cada publicación se conservan.
 
+## Portal publicado en demostración — decisión del 30-oct-2026
+
+**Se conserva la demostración por decisión expresa del propietario.** La revisión
+del 30-oct encontró cero variables de proyecto en Vercel para producción; el
+bundle público usa placeholder.supabase.co y no contiene el host del Supabase
+compartido. El frontend publicado no debe presentarse como un portal conectado
+a datos reales ni sus pantallas como confirmación de operaciones persistidas.
+Las funciones de backend publicadas que se describen abajo son un estado distinto.
+
+El cierre del acceso local ficticio cuando falta configuración está preparado
+en [PR #1](https://github.com/llantera-digital/afiliados/pull/1), rama
+codex/cerrar-demo-sin-config-prod, **sin integrar ni publicar**. Esa rama tiene
+9/9 pruebas (4 anteriores + 5 de autenticación con dobles) y build con tipos
+correcto; main conserva sus 4 pruebas. Publicarla sin definir la conexión real
+impediría el acceso actual de demostración, por lo que se pospuso. No se cambiaron
+credenciales, variables, cuentas, roles, RLS o reglas de comisiones.
+
+La modalidad comercial siguiente define el programa previsto de invitaciones;
+no acredita una conexión real del portal ni cambia por sí sola su modo técnico.
+
 ## Modalidad comercial acordada — 30-oct-2026
 
 El propietario permite **dar altas aunque el correo automático todavía no esté
@@ -27,7 +47,7 @@ El objetivo es conservar un proyecto ordenado, comprensible y coordinado. La lim
 | Limpieza del 24-oct | Seis archivos archivados, tres originales conservados y nueve registros verificados en `RECUERDO/INVENTARIO.csv` (evidencia local, no versionada). |
 | Código actual en disco | Alta v20, conteo aplicado (migración `20261025000000`) y outbox aplicado (migración `20261025010000`, función v18). El envío real de correo sigue pendiente de verificar. No asumir que todo `supabase/` coincide con producción. |
 | Versión anterior | Los dos `index.ts` originales están conservados y verificados contra las huellas anteriores al cambio. No se restauraron. |
-| Producción | Alta v20 activa, con `verify_jwt=true`, confirmada en Supabase. Avisos v18, con `verify_jwt=false`. Las pruebas sintéticas publicadas se documentan abajo; no certifican todo el módulo financiero. |
+| Backend publicado | Alta v20 activa, con `verify_jwt=true`, confirmada en Supabase. Avisos v18, con `verify_jwt=false`. Las pruebas sintéticas publicadas se documentan abajo; no certifican todo el módulo financiero. |
 | Trabajo futuro | Las tres correcciones están publicadas. Falta habilitar y comprobar el correo y su ejecución periódica, según la lista siguiente; esto no bloquea las altas manuales acordadas. No instalar entornos en esta PC. |
 
 El inventario funcional y los originales están en `work/cambio-20261025/EVIDENCIAS.md` (evidencia local, no versionada) y distinguen ambas versiones sin perder trabajo. No ejecutar `db push`, migraciones ni scripts de reversión como parte de la limpieza.
