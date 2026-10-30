@@ -1,0 +1,18 @@
+# Subir fuentes desde esta raiz; regenerar el build en el entorno elegido.
+.git/
+.vercel/
+node_modules/
+dist/
+RECUERDO/
+work/
+backups/
+supabase/.temp/
+.env*
+!.env.example
+CREDENCIALES*
+*.local
+*.log
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo

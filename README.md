@@ -6,6 +6,11 @@ Portal independiente para administrar afiliados, cupones, mensualidades, comisio
 
 ## Portal publicado en demostración — decisión del 30-oct-2026
 
+**Prioridad pospuesta por el propietario, 30-oct-2026:** Afiliados es el componente
+de menor prioridad. Conservar su demostración y retomar la conexión/operación real
+después de los otros componentes. Los procedimientos futuros de este README no
+autorizan crear cuentas, publicar la guardia, habilitar correo o cambiar comisiones.
+
 **Se conserva la demostración por decisión expresa del propietario.** La revisión
 del 30-oct encontró cero variables de proyecto en Vercel para producción; el
 bundle público usa placeholder.supabase.co y no contiene el host del Supabase
@@ -57,6 +62,7 @@ El objetivo es conservar un proyecto ordenado, comprensible y coordinado. La lim
 | Parte | Estado |
 |---|---|
 | Limpieza del 24-oct | Seis archivos archivados, tres originales conservados y nueve registros verificados en `RECUERDO/INVENTARIO.csv` (evidencia local, no versionada). |
+| Mantenimiento del 30-oct | Tres archivos del dist de otra rama archivados en `RECUERDO/dist-rama-guardia-20261030/`, SHA-256 origen/destino iguales; inventario actual 12 registros. Sin dist activo ni cambios en la demo publicada. |
 | Código actual en disco | Alta v20, conteo aplicado (migración `20261025000000`) y outbox aplicado (migración `20261025010000`, función v18). El envío real de correo sigue pendiente de verificar. No asumir que todo `supabase/` coincide con producción. |
 | Versión anterior | Los dos `index.ts` originales están conservados y verificados contra las huellas anteriores al cambio. No se restauraron. |
 | Backend publicado | Alta v20 activa, con `verify_jwt=true`, confirmada en Supabase. Avisos v18, con `verify_jwt=false`. Las pruebas sintéticas publicadas se documentan abajo; no certifican todo el módulo financiero. |
@@ -64,7 +70,7 @@ El objetivo es conservar un proyecto ordenado, comprensible y coordinado. La lim
 
 El inventario funcional y los originales están en `work/cambio-20261025/EVIDENCIAS.md` (evidencia local, no versionada) y distinguen ambas versiones sin perder trabajo. No ejecutar `db push`, migraciones ni scripts de reversión como parte de la limpieza.
 
-## Próximo trabajo: habilitar los avisos por correo
+## Trabajo pospuesto: habilitar los avisos por correo
 
 **Habilitación futura, no requisito para las altas manuales.** La lista siguiente
 describe cómo cerrar técnicamente el envío cuando se retome, no un bloqueo comercial.
@@ -81,6 +87,31 @@ describe cómo cerrar técnicamente el envío cuando se retome, no un bloqueo co
 **Criterio de cierre:** autenticación válida comprobada, correo recibido en la bandeja autorizada, estados y reintentos verificados y programador único funcionando. Hasta entonces, describir el correo como pendiente de habilitación, aunque la función aparezca activa. Esta lista no habilita servicios por sí misma. La programación de `release_due_commissions` es un pendiente distinto y debe revisarse por separado.
 
 ## Responsabilidades y coordinación
+
+### Migraciones: correspondencias y excepciones
+
+El [inventario remoto del 30-oct](../00_CONTROL_DEL_PROYECTO/16_despliegue_y_migraciones.md#inventario-de-metadatos-vigente-al-30-oct-2026)
+lista 51 versiones del proyecto compartido. Los nombres de estas correspondencias
+identifican su propósito; **no certifican igualdad byte a byte ni son instrucciones
+de migration repair**. No renombrar, fusionar o reaplicar históricos por esta tabla.
+
+| Archivo local en supabase/migrations | Versión registrada relacionada |
+|---|---|
+| 20260627010000_affiliates_core.sql | 20260627200435 affiliates_core |
+| 20260627011000_affiliates_business_logic.sql | 20260627200452 affiliates_business_logic |
+| 20260627012000_affiliates_rls_and_views.sql | 20260627200506 affiliates_rls_and_views |
+| 20260627013000_affiliates_admin_operations.sql | 20260627200521 affiliates_admin_operations |
+| 20260628220818_assign_affiliate_late.sql | Sin esa versión en el historial consultado; el archivo sí está versionado en Git. Ausencia de registro no demuestra ausencia de la función. |
+| 20261025000000_fix_affiliate_p1.sql | 20261025000000 |
+| 20261025010000_outbox_claim_identity.sql | 20261025010000 |
+
+Corrección posterior aplicada desde 01:
+[20261030163425_corregir_mensajes_afiliados_unicode.sql](../01_WEB_LLANTERA_DIGITAL/supabase/migrations/20261030163425_corregir_mensajes_afiliados_unicode.sql)
+actualiza solo cinco textos de error en assign_affiliate_coupon,
+register_client_payment, create_billing_period y create_affiliate_payout.
+No cambió lógica, firmas o permisos. No copiar esa migración a 06 ni reemplazarla
+por las definiciones históricas. El default México también se corrigió desde 01
+con 20261030160051. Esta carpeta no reconstruye por sí sola toda la base.
 
 - `06` mantiene el portal de afiliados, sus reglas específicas y las funciones `affiliate-admin-user` y `send-affiliate-notifications`.
 - `public.clientes` y el proyecto Supabase son compartidos. Antes de modificar datos, permisos o esquema, revisar sus consumidores; no decidir únicamente desde este portal.
@@ -119,7 +150,13 @@ La corrección del alta está **publicada** en Supabase como `affiliate-admin-us
 
 **Publicación del alta.** Incluye dos defectos encontrados en la revisión previa: el JSON malformado ahora se rechaza con 400 (`parsearCuerpo`) y las compensaciones incompletas se registran con `COMPENSATION_PARTIAL` desde el adaptador. El contrato del frontend no cambió: `201 {id, username, role}` en éxito y `{error}` en error; `compensacion_incompleta` solo aparece si la compensación falla.
 
-**Pruebas de la publicación.** Contra la función publicada se ejecutaron diez comprobaciones con usuarios sintéticos: 401 sin sesión, 403 sin rol admin, 400 por JSON malformado, 400 sin etapas y con etapas inválidas, 201 en alta válida, 400 por usuario duplicado, registros 1/1/1/1/2 y limpieza 0/0/0/0. Evidencia en `work/prueba-publicada/resultado.json`. Los recursos sintéticos se eliminaron y se verificó que no quedaran restos.
+**Pruebas de la publicación anterior.** La evidencia `work/prueba-publicada/resultado.json`
+identifica **affiliate-admin-user v19**, no v20, para las diez comprobaciones:
+401 sin sesión, 403 sin rol admin, 400 por JSON malformado, 400 sin etapas/con etapas
+inválidas, 201 en alta válida, 400 por usuario duplicado, registros 1/1/1/1/2 y
+limpieza 0/0/0/0. La versión vigente v20 está documentada por metadatos/hash;
+no atribuirle automáticamente estas pruebas ni afirmar equivalencia de cuerpos
+solo por números de versión. No se repitieron ni crearon usuarios en este cierre.
 
 **Publicación del conteo.** La migración `20261025000000` se aplicó con la API de administración y se registró en `supabase_migrations.schema_migrations`; la `20261025010000` no se tocó. La vista conserva columnas, tipos, `security_invoker`, propietario y privilegios, y solo cambió el cálculo. Se probó en producción con seis clientes sintéticos: 2×2→2, 3×2→3, 2×1→2, 2×0→2, 0×2→0 y 1 pagada + 1 pendiente→1, con `last_paid_at` y etapas correctos. La limpieza dejó cero registros en las ocho tablas implicadas. La definición anterior exacta y la restauración están en `work/cambio-20261025/vista-antes.sql` y en EVIDENCIAS.md.
 
@@ -127,9 +164,19 @@ La corrección del alta está **publicada** en Supabase como `affiliate-admin-us
 
 **Idempotencia de Resend.** La documentación oficial acepta `Idempotency-Key` de 1–256 caracteres y deduplica durante **24 horas**: la misma clave con el mismo payload devuelve la misma respuesta sin reenviar, y con un payload distinto responde `409 invalid_idempotent_request`. No hay entrega «exactamente una vez»: fuera de la ventana de 24 h, o si cambia el payload, un reintento puede enviar de nuevo. El código usa el `id` del aviso como clave, que es estable entre reintentos.
 
-**Restauración.** El código desplegado de v18 se recuperó del bundle eszip y se conserva en `work/restauracion-v18/index.ts` (hash `9437875D…`), junto con el bundle íntegro. Esa copia difiere de `work/cambio-20261025/antes/` solo en la codificación de acentos y dos líneas en blanco. Para volver a v18: copiar ese `index.ts` sobre la función y desplegar; el `core.mjs` actual queda sin uso.
+**Recuperación histórica del alta (affiliate-admin-user v18).** El fuente de esa
+función se conserva en `work/restauracion-v18/index.ts` (hash `9437875D…`) junto
+con el bundle. Es una versión anterior a las correcciones del alta, no el código
+de send-affiliate-notifications v18. Su diferencia con antes/ es codificación y
+dos líneas en blanco. Redesplegarlo reintroduciría limitaciones anteriores y dejaría
+core.mjs sin uso; no hacerlo por esta limpieza ni copiarlo a la función de avisos.
 
-**Restauración del outbox.** El fuente desplegado de v16 se recuperó del bundle y está en `work/restauracion-v16/index.ts` (hash `1525D2BE…`), con el bundle íntegro. Para revertir: pausar invocaciones, copiar ese `index.ts`, desplegar y **conservar** las columnas, los índices y las filas; no hace falta borrar el esquema ni el historial.
+**Recuperación histórica de avisos (send-affiliate-notifications v16).** Su fuente
+está en `work/restauracion-v16/index.ts` (hash `1525D2BE…`) y su bundle, no en la
+carpeta restauracion-v18 del alta. Una recuperación autorizada exige pausar
+invocaciones y revisar compatibilidad antes de redesplegar; conservar columnas,
+índices y filas. No ejecutar revertir.sql ni borrar historial para recuperar código:
+la reversión de esquema es otro procedimiento histórico que puede retirar objetos.
 
 **Limitaciones.** El envío real de correo no se verificó: entre los secretos del proyecto no están `AFFILIATE_CRON_SECRET` ni `RESEND_API_KEY`, y no hay un destinatario de pruebas autorizado. Sin `AFFILIATE_CRON_SECRET` la función rechaza toda invocación (401), así que tampoco se pudo probar el camino con secreto válido ni la respuesta `processed/sent/failed/late` desde el endpoint. No se tocaron permisos, RLS, cron, modelos ni WhatsApp. Alta en `6abf294`; conteo en `d85fdc`; el outbox se publica en un commit posterior de `main`. La sincronización de código funcional comprobada fue `51a6bf8`; las revisiones documentales posteriores no cambian esa referencia de código probado. `43b69d4` fue la sincronización anterior y se conserva como antecedente.
 
@@ -195,6 +242,16 @@ npm run preview
 
 `npm test` ejecuta Vitest. `npm run build` ejecuta primero `tsc --noEmit -p tsconfig.app.json` y después Vite; aquí sí se exige que los tipos del frontend pasen. `preview` sirve el resultado compilado. Las funciones Edge y el SQL requieren comprobaciones aparte; el build no los aplica ni los publica.
 
+**No publicar un dist previo.** El 30-oct se confirmó que el dist local contenía
+la guardia del PR #1, aunque main conservaba la demo; se archivaron sus tres archivos
+con hashes, sin reconstruir ni cambiar código. `npm run preview` requiere primero
+un build nuevo del checkout y variables elegidos: no interpreta src directamente.
+La compilación se puede realizar en la nube, sin instalar un ambiente en esta PC.
+`.vercelignore` excluye dist, variables privadas, credenciales, work y RECUERDO de
+subidas CLI hechas desde esta raíz. No sustituye revisar el directorio de subida
+ni impide una publicación explícita desde otra carpeta. No usar --prebuilt con un
+artefacto heredado ni inferir configuración de Supabase por existir .env.local.
+
 No hay una APK o app Android en esta carpeta. El producto se distribuye como portal web.
 
 ## Configuración pública y secretos
@@ -224,6 +281,68 @@ El personal introduce usuario y contraseña. El código convierte el usuario en 
 | Administrador | `/admin`, `/admin/afiliados`, `/admin/clientes`, `/admin/pagos`, `/admin/comisiones`, `/admin/auditoria` |
 
 Las rutas protegidas redirigen según el rol. Esa protección de la interfaz debe complementarse con comprobaciones reales de permisos en funciones, RPC y tablas. El primer administrador requiere un alta controlada en Supabase Auth y su perfil administrativo; no se creó ninguno durante esta revisión. Las altas posteriores utilizan `affiliate-admin-user`, que valida una sesión y perfil de administrador antes de operar.
+
+### Altas y contraseñas: procedimiento previsto al retomar
+
+**No ejecutado ni habilitado desde la demo actual.** La captación/invitación manual
+puede continuar fuera del portal; el acceso demo no acredita un alta de Auth o un
+registro persistido. Antes de entregar acceso operativo se debe decidir conectar
+el portal y validar una sesión administrativa real, sin rehacer la guardia del PR #1.
+
+1. Primer administrador: usar el alta administrativa de Supabase Auth del proyecto
+   autorizado, con el correo interno que genera usernameToInternalEmail (usuario
+   normalizado + @afiliados.llantera.digital) y contraseña elegida por el propietario.
+   Debe ser una cuenta confirmada, como hace affiliate-admin-user con email_confirm;
+   no esperar que un correo de verificación llegue a esa dirección interna.
+   No insertar ni editar auth.users por SQL. Registrar su UUID real.
+2. Crear el perfil public.affiliate_portal_users correspondiente: auth_user_id igual
+   a ese UUID, username acordado, role=admin, affiliate_id=null, is_active=true.
+   Un usuario Auth sin ese perfil no es administrador de esta aplicación.
+   Esta creación concede acceso administrativo: revisarla expresamente al retomar;
+   no promover un nombre que empiece por admin ni alterar RLS para hacerlo entrar.
+3. Afiliados posteriores: desde /admin/afiliados con sesión real, el formulario
+   invoca affiliate-admin-user. La función exige usuario de 3–40 caracteres
+   (letras, dígitos, punto, guion o guion bajo) y contraseña de al menos 8 caracteres.
+   Crear nombre, cupón, descuento y etapas con condiciones acordadas, sin inventar
+   tasas. Crea Auth confirmado y perfil; no envía un correo de invitación.
+4. El propietario entrega usuario, contraseña y URL por su canal privado elegido.
+   Si conserva la contraseña original, usar su registro privado, fuera de Git,
+   documentación y evidencias. Supabase Auth no ofrece recuperarla en texto plano.
+   El hash_portal_password de 01 y password_admin_hash no son el alta de 06.
+5. Comprobar login contra Auth y perfil activo, rol/affiliate_id, aislamiento y
+   persistencia; un login demo exitoso no es esa comprobación. Si aparece
+   compensacion_incompleta/COMPENSATION_PARTIAL, revisar los pasos residuales antes
+   de repetir el alta; no borrar datos financieros para resolverla.
+
+Para restablecer una contraseña, identificar usuario/UUID y usar administración
+autorizada de Auth; entregar la nueva por canal privado y verificar sesión/perfil.
+No cambiar roles ni editar hashes para restablecer acceso. Desactivar is_active
+no se presenta aquí como revocación instantánea de todos los tokens: esa comprobación
+y la guía operativa de suspensión quedan para la activación real. No se crearon
+cuentas, concedieron roles, restablecieron contraseñas o probaron estas altas ahora.
+
+### Operaciones implementadas y lo que falta para operarlas
+
+| Operación | Fuente / alcance al retomar |
+|---|---|
+| Alta, atribución tardía y registro de pago | Implementadas en AdminScreens.tsx para configuración/sesión reales; no operativas contra datos reales desde la demo publicada. Pago requiere UUID de periodo. |
+| Atribución por cupón | RPC assign_affiliate_coupon, sin pantalla. Conciliar su uso con assign_affiliate_late antes de operar; no eliminar la vía tardía. |
+| Crear periodo | RPC create_billing_period, sin pantalla; requiere datos/UUID revisados, no se deben deducir de métricas demo. |
+| Anular pago, sustituir etapas, payout | RPC annul_client_payment, replace_client_commission_tiers, create_affiliate_payout, sin pantallas y sin guía operativa integral validada. Conservar como capacidad implementada pendiente de puesta en operación, no como ciclo financiero listo. |
+| Liberar comisiones | release_due_commissions; sin programación verificada ni pantalla. No crear un cron ni usar credenciales del navegador por esta limpieza. |
+
+La UI de alta crea dos etapas **finitas** (1–12 y 13–24); que el validador admita una
+indefinida no significa que el formulario la ofrezca. El código SQL conserva una
+liberación de 15 días; los importes y tasas de la matriz son ejemplos de aceptación,
+no una lista comercial aprobada. Confirmar condiciones por afiliado al retomar,
+sin cambiar esos valores ahora. No hay guía aprobada para suspender/reasignar una
+afiliación o resolver pagos agrupados; son tareas futuras, no operaciones a improvisar.
+
+El lector de cupón del afiliado utiliza single() sobre cupón activo: presupone uno
+solo para esa vista; no se documenta como restricción única de base. Varios activos
+pueden impedir mostrarlo. El aviso de comisión se encola solo si affiliates.email
+no es null; la existencia de usuario Auth con correo interno no sustituye ese correo
+de contacto. Correo ausente o no válido no acredita recepción de avisos.
 
 ## Datos y reglas de negocio
 
