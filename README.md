@@ -24,6 +24,18 @@ credenciales, variables, cuentas, roles, RLS o reglas de comisiones.
 La modalidad comercial siguiente define el programa previsto de invitaciones;
 no acredita una conexión real del portal ni cambia por sí sola su modo técnico.
 
+Referencia más reciente de frontend, comprobada el **30-oct-2026**:
+`dpl_8rNyJon3KiDGaSGHwraLNEsP8BdV` / `8ecb75f`, demostración conservada.
+El deployment `dpl_8vZg43JibBrv6hQqQBQuEWb33D5D` / `51a6bf8` descrito más abajo
+corresponde al cierre del 28-oct; es anterior, no el último comprobado.
+Antes de recuperar, consultar en Vercel el alias y deployment vigentes: un commit
+documental puede producir otro deployment sin cambiar el comportamiento.
+
+**Decisión sobre P2 «acceso y demo explícitos»:** el hallazgo técnico de la tabla
+se conserva como antecedente. Su cambio está **pospuesto por el propietario desde
+el 30-oct**; no integrar ni publicar la guardia del PR #1 mientras se mantenga la
+demostración. No es una autorización para cambiar el acceso actual.
+
 ## Modalidad comercial acordada — 30-oct-2026
 
 El propietario permite **dar altas aunque el correo automático todavía no esté
