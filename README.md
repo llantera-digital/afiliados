@@ -4,6 +4,24 @@ Portal independiente para administrar afiliados, cupones, mensualidades, comisio
 
 **Raíz:** `C:\Llantera_Digital\06_AFILIADOS`. Documentación funcional al 25 de octubre de 2026 y última revisión documental el **30-oct-2026**. Este README es la entrada del componente; el [centro de control](../00_CONTROL_DEL_PROYECTO/README.md) explica su relación con los demás proyectos. Las fechas internas de cada publicación se conservan.
 
+## Corrección preparada, no publicada: acceso sin configuración — 30-oct-2026
+
+**Rama codex/cerrar-demo-sin-config-prod, PR #1. No integrada en main.**
+El propietario decidió conservar la demostración el 30-oct-2026. La guardia
+siguiente está preparada y probada, pero su publicación queda pospuesta hasta
+definir la conexión del portal a datos reales. En esta rama, si faltan URL o
+clave de Supabase, producción rechaza el intento de login con
+«El portal no está configurado. Contacta al administrador.» y no crea la identidad
+local basada en el prefijo admin. El modo local anterior se conserva solo fuera
+de producción. Con configuración válida se sigue usando signInWithPassword,
+el mismo usuario/correo interno y la contraseña exacta: no se migraron cuentas ni
+se cambiaron las altas manuales por invitación.
+
+Verificación local: **9/9** pruebas (4 existentes + 5 de AuthProvider) y build
+con TypeScript estricto correcto. Las pruebas de autenticación usan dobles y
+renderizado de servidor, sin cuentas, sesiones o peticiones externas. No
+certifican por sí solas un login real ni la matriz financiera.
+
 ## Modalidad comercial acordada — 30-oct-2026
 
 El propietario permite **dar altas aunque el correo automático todavía no esté
@@ -62,7 +80,7 @@ La tabla siguiente describe los hallazgos originales del 24-oct y sus criterios 
 
 ### Hallazgos originales y criterios para una futura corrección
 
-La compilación y las cuatro pruebas actuales pasan, pero esas pruebas solo cubren formato de presentación e identificación interna del usuario. **No certifican cálculos financieros, aislamiento entre afiliados, altas transaccionales ni entrega de correos.**
+En el cierre original pasaban la compilación y cuatro pruebas de formato e identificación. El cierre del 30-oct amplía la suite a nueve con la guardia de configuración de producción. **No certifican cálculos financieros, aislamiento entre afiliados, altas transaccionales ni entrega de correos.**
 
 | Prioridad | Hallazgo y alcance de la evidencia | Corrección y criterio de cierre |
 |---|---|---|
@@ -71,7 +89,7 @@ La compilación y las cuatro pruebas actuales pasan, pero esas pruebas solo cubr
 | **P1 · conteo correcto de mensualidades** | La vista `affiliate_visible_clients` calcula `count(bp.id)` tras unir periodos con etapas. La reproducción relacional mínima con los mismos joins y agregado contó **cuatro** mensualidades al existir **dos** periodos pagados y dos etapas. Evidencia: `hallazgo-conteo.json`; reproducción SQLite en memoria, no validación PostgreSQL remota. | Evitar multiplicación de filas mediante agregación independiente o conteo correcto de periodos únicos. Validar en PostgreSQL con varios periodos, varias etapas, etapas desactivadas y clientes sin pagos. No confundir este contador con una prueba de todos los importes de comisión. |
 | **P1 · privacidad y aislamiento** | El hallazgo original del 24-oct detectó vistas de columnas mínimas y políticas de fila propias sobre tablas base con notas o referencias internas; no se declaró exposición real. | **Antecedente superado en la base:** el cierre posterior dejó `clientes` con RLS y sin permiso de lectura de tabla completa para `anon/authenticated`; `authenticated` conserva SELECT sobre cinco columnas comerciales sujeto a RLS; `affiliate_visible_clients` conserva `SELECT` para `authenticated`. La validación integral de permisos, columnas y aislamiento sigue pendiente de evidencia específica con dos afiliados y un administrador. Mantener la matriz de aceptación (punto 12) como regresión; no declarar cerrado el aislamiento completo solo por el estado de RLS. |
 | **P1 · ciclo financiero completo** | La matriz de aceptación del negocio no tiene aquí pruebas automatizadas de pagos parciales, anulaciones, compensaciones, reactivación y payouts. El cálculo de compensaciones en `create_affiliate_payout` se obtiene antes del bloqueo posterior de esas filas: requiere una prueba específica de concurrencia entre payouts del mismo afiliado. Es revisión estática pendiente de validación transaccional. | Ejecutar la matriz descrita más abajo en un entorno de prueba separado y añadir regresiones financieras, de permisos y concurrencia. No certificar importes o pagos agrupados solo porque el frontend compila. |
-| **P2 · acceso y demo explícitos** | Sin URL/clave configuradas, `AuthContext` crea una identidad local por el nombre: un usuario que comienza con `admin` recibe el rol local de administrador. No autentica contra Supabase. `VITE_APP_ENV` no controla ese recorrido y la interfaz no lo presenta claramente como demo. Esto no demuestra acceso al backend real sin credenciales. | Separar el modo de demostración explícito del modo operativo y fallar de forma visible ante configuración ausente/inválida en producción. Comprobar arranque sin variables, con marcadores de ejemplo y con sesión real. |
+| **P2 · acceso y demo explícitos** | Sin URL/clave configuradas, `AuthContext` crea una identidad local por el nombre: un usuario que comienza con `admin` recibe el rol local de administrador. No autentica contra Supabase. `VITE_APP_ENV` no controla ese recorrido y la interfaz no lo presenta claramente como demo. Esto no demuestra acceso al backend real sin credenciales. **Preparada, no publicada:** PR #1 cierra esa identidad en producción; el propietario mantiene por ahora la demostración actual. | Separar el modo de demostración explícito del modo operativo y fallar de forma visible ante configuración ausente/inválida en producción. Comprobar arranque sin variables, con marcadores de ejemplo y con sesión real. |
 | **P2 · interfaz y errores de datos** | Varias consultas sustituyen errores por listas vacías o ceros; el cupón puede quedar en Cargando cuando falta configuración. No hay pantallas para todas las operaciones SQL existentes —crear periodos, anular pagos, cambiar etapas y registrar payouts— y el pago exige introducir un UUID de periodo. | Distinguir error, ausencia de datos y carga. Completar o delimitar el flujo administrativo antes de presentarlo como operación integral. Añadir estados y permisos verificables. |
 | **P2 · automatizaciones y política vigente** | No hay en estos archivos evidencia de un cron activo para liberar comisiones/enviar outbox. Además, la migración posterior incorpora atribución tardía, excepción a la especificación inicial de cupón exclusivo al contratar. | Verificar programación real y dominio de correo sin asumir que están activos. Conciliar la regla de atribución tardía con la política aprobada, sin quitar esa función ni cambiar condiciones comerciales durante mantenimiento. |
 
@@ -241,7 +259,7 @@ Usar datos inequívocamente ficticios en un entorno de prueba y conservar audito
 12. Probar dos afiliados, URLs, API, tablas base y vistas: no deben obtener filas ajenas ni datos internos.
 13. Comprobar que correo, teléfono, notas y referencias privadas no aparecen en la información accesible del afiliado, y que los avisos resisten concurrencia e interrupciones sin perderse o duplicarse.
 
-Añadir casos del contador con varias etapas, estados de carga/error y ausencia de variables. Las cuatro pruebas actuales no cubren esta matriz.
+Añadir casos del contador con varias etapas y estados de carga/error. Las nueve pruebas actuales incluyen ausencia de configuración en producción, pero no cubren esta matriz financiera.
 
 ## Alojamiento y resultado histórico de la limpieza del 24-oct
 

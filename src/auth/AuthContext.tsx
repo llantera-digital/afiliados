@@ -46,6 +46,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = useCallback(async (username: string, password: string) => {
     if (!isSupabaseConfigured) {
+      if (import.meta.env.PROD) {
+        throw new Error('El portal no está configurado. Contacta al administrador.')
+      }
       setIdentity({ username, role: username.toLowerCase().startsWith('admin') ? 'admin' : 'affiliate', affiliateId: null })
       return
     }
